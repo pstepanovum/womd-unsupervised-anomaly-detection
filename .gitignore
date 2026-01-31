@@ -1,0 +1,13 @@
+# Data
+*.csv
+*.tfrecord
+*.RData
+
+# Outputs
+*.mp4
+*.png
+*.pdf
+*.log
+*.aux
+__pycache__/
+.DS_Store
