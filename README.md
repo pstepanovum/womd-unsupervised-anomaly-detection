@@ -1,5 +1,9 @@
 # Unsupervised Statistical Learning for Kinematic Anomaly Detection in Autonomous Driving
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Paper](https://img.shields.io/badge/Paper-PDF-red.svg)](docs/main.pdf)
+
 ## Abstract
 
 This project applies unsupervised statistical learning techniques to the Waymo Open Motion Dataset (WOMD v1.3.1) to identify high-risk and anomalous driving behaviors. By extracting kinematic features (velocity, acceleration, yaw rate) from over 10,000 traffic agents, we employ Principal Component Analysis (PCA) for dimensionality reduction and compare Mahalanobis Distance against One-Class Support Vector Machines (SVM) for outlier detection. The identified anomalies are validated against ground-truth interaction flags provided by Waymo to assess the correlation between statistical outliers and safety-critical events.
