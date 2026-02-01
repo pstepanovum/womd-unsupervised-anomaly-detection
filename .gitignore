@@ -5,7 +5,6 @@
 # Outputs
 *.mp4
 *.png
-*.pdf
 *.log
 *.aux
 __pycache__/
