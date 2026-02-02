@@ -1,0 +1,98 @@
+% !TeX root = proposal.tex
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\begin{document}
+
+\title{Unsupervised Statistical Learning for Kinematic Anomaly Detection in Autonomous Driving Scenarios}
+
+\author{\IEEEauthorblockN{Pavel Stepanov}
+\IEEEauthorblockA{\textit{Dept. of Computer Science} \\
+\textit{University of Miami} \\
+Coral Gables, USA \\
+pas273@miami.edu}
+\and
+\IEEEauthorblockN{Ramses Loaces}
+\IEEEauthorblockA{\textit{Dept. of Computer Science} \\
+\textit{University of Miami} \\
+Coral Gables, USA \\
+rxl1238@miami.edu}
+\and
+\IEEEauthorblockN{Justin Cabrera}
+\IEEEauthorblockA{\textit{Dept. of Computer Science} \\
+\textit{University of Miami} \\
+Coral Gables, USA \\
+justin.cabrera2718@gmail.com}
+}
+
+\maketitle
+
+\begin{IEEEkeywords}
+Statistical Learning, Anomaly Detection, Waymo Open Dataset, Unsupervised Learning, Kinematics
+\end{IEEEkeywords}
+
+\section{Introduction}
+The deployment of autonomous vehicles (AVs) requires rigorous validation against the ``long tail'' of driving behavior. Although the majority of urban driving is uneventful—characterized by steady speeds, lane following, and predictable interactions—a small fraction of events such as sudden acceleration or deceleration, aggressive lane changes, near-miss interactions, or jaywalking pedestrians may be considered anomalous and safety-critical. Traditional supervised learning approaches are often limited by the scarcity of labeled anomaly data and the subjective nature of what constitutes an ``unsafe'' maneuver. Consequently, unsupervised novelty detection techniques are well suited for mining large-scale datasets for rare but important events \cite{pimentel2014review}.
+
+The Waymo Open Motion Dataset (WOMD) is a high-fidelity and widely studied benchmark in autonomous driving research, most commonly used for deep learning-based motion prediction and interaction modeling \cite{ettinger2021waymo}. In contrast, this project adopts a classical statistical learning perspective that emphasizes interpretability and distributional analysis. The objective is to characterize typical kinematic behavior in urban traffic and identify deviations from this norm that may correspond to anomalous or high-risk driving scenarios.
+
+\section{Data Description}
+This project utilizes the Waymo Open Motion Dataset (WOMD) v1.3.1 \cite{waymo_motion_dataset}, a large-scale collection of real-world urban driving data \cite{sun2020scalability}. The dataset consists of over 100,000 driving segments, each spanning 20 seconds and sampled at 20Hz. Each segment includes trajectories for multiple agents, such as vehicles, pedestrians, and cyclists, along with metadata including agent type, bounding box dimensions, and traffic signal state.
+
+The dataset is distributed in a sharded Protocol Buffer (TFRecord) format. Python is used solely for data extraction, enabling the parsing of TFRecord shards and the selection of one or more representative scenarios. Once extracted, agent trajectories and kinematic variables are converted into a structured tabular format for downstream analysis.
+
+While the dataset contains information indicating stops at traffic signals, this behavior is not considered particularly interesting for the purposes of this project, since vehicles are expected to stop at red lights. Instead, the focus is on identifying anomalous behaviors during periods of active motion, particularly during permissive signal phases (e.g., green lights).
+
+Due to the high dimensionality of the data, there can be an extensive amount of missing values. This can occur for one of three reasons: the view of an object may be obstructed and therefore not visible to the LiDAR sensor while still maintaining a track, an object may move outside of the LiDAR’s sensor range, or the object may not be present for the full 20 seconds of the scene. These cases are handled primarily through filtering and consistency checks rather than aggressive imputation.
+
+\subsection{Feature Extraction}
+For each agent, kinematic features are extracted at the prediction horizon ($t = 0$) to capture the instantaneous state of the agent during periods of peak interaction density. The proposed feature set includes:
+\begin{itemize}
+    \item \textbf{Speed ($v$):} Magnitude of the velocity vector ($m/s$).
+    \item \textbf{Acceleration ($a$):} Rate of change of speed ($m/s^2$).
+    \item \textbf{Yaw Rate ($\dot{\psi}$):} Angular velocity representing the rate of change of heading ($rad/s$).
+    \item \textbf{Lateral G-Force:} Computed as $|v \times \dot{\psi}|$, serving as a proxy for cornering intensity.
+\end{itemize}
+
+\subsection{Tooling and Data Pipeline}
+All statistical analysis, visualization, and unsupervised modeling are performed in R. Python is used exclusively as a preprocessing tool to extract and structure the raw Waymo Motion Dataset into a tabular format suitable for statistical analysis.
+
+After extraction, the dataset is exported to a comma-separated values (CSV) format and processed entirely in R, where exploratory analysis, dimensionality reduction, and anomaly detection are conducted.
+
+\section{Planned Methodology}
+
+\subsection{Preprocessing}
+Preprocessing involves removing autonomous vehicle (SDC) tracks to focus on human-driven agents. Extracted features are normalized using Z-score standardization so that variables with different units and scales contribute equally to distance-based calculations.
+
+\subsection{Dimensionality Reduction}
+Principal Component Analysis (PCA) \cite{jolliffe2002principal} is applied to reduce the dimensionality of the kinematic feature space. By projecting the original feature vectors onto a lower-dimensional subspace, PCA facilitates visualization of nominal driving patterns and reduces noise prior to anomaly detection.
+
+\subsection{Anomaly Detection}
+Multiple unsupervised methods are evaluated to identify deviations from typical driving behavior:
+\begin{enumerate}
+    \item \textbf{Mahalanobis Distance:} A multivariate distance metric that accounts for the covariance structure of the data \cite{mahalanobis1936generalized}. Agents exceeding a high-confidence $\chi^2$ threshold are flagged as potential anomalies.
+    \item \textbf{One-Class SVM (OC-SVM):} A non-parametric boundary-based method designed to estimate the support of a high-dimensional distribution \cite{scholkopf2001estimating}. A radial basis function kernel is used to capture non-linear structure.
+\end{enumerate}
+
+\section{Research Questions}
+This project investigates the following research questions:
+\begin{itemize}
+    \item What statistical thresholds on kinematic features (e.g., acceleration or rate of change of acceleration) best distinguish routine or defensive maneuvers from anomalous behavior?
+    \item To what extent do vehicle velocity and acceleration distributions conform to common parametric assumptions (e.g., normality) in urban traffic?
+    \item Can short time-based thresholds (e.g., sub-2-second interactions) reliably identify near-miss events without excessively flagging standard merges or lane changes?
+    \item What proportion of pedestrian trajectories occur outside designated crossing areas, and do these events correspond to measurable changes in nearby vehicle kinematics?
+\end{itemize}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
