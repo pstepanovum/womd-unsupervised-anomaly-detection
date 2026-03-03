@@ -1,0 +1,117 @@
+---
+title: "Project Submission"
+format: html
+editor: visual
+---
+
+```{r}
+data <- read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")
+head(data)
+dim(data)
+summary(data)
+```
+
+```{r}
+
+model_data <- data[, c(
+  "AgentType",
+  "Speed",
+  "Acceleration",
+  "YawRate",
+  "Vel_X",
+  "Vel_Y",
+  "FutureDist_5s"
+)]
+
+# Remove rows missing FutureDist_5s
+model_data <- subset(model_data, !is.na(FutureDist_5s))
+
+```
+
+```{r}
+summary(model_data$Speed)
+summary(model_data$FutureDist_5s)
+
+aggregate(Speed ~ AgentType, data = model_data, mean)
+```
+
+```{r}
+moving_data <- subset(data, Speed > 0)
+
+aggregate(Speed ~ AgentType, data = moving_data, mean)
+```
+
+> When including stationary agents, vehicles exhibited a lower mean speed than cyclists due to a high proportion of zero-velocity observations (e.g., vehicles stopped at intersections). After filtering for moving agents (Speed \> 0), vehicles exhibited the highest average speed (6.74 m/s), followed by cyclists (3.92 m/s) and pedestrians (1.07 m/s), consistent with real-world expectations.
+
+```{r}
+FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
+```
+
+```{r}
+# Base cleaned dataset (no NA in predictors or target)
+base_data <- subset(data, 
+                    !is.na(Speed) &
+                    !is.na(Acceleration) &
+                    !is.na(YawRate) &
+                    !is.na(Vel_X) &
+                    !is.na(Vel_Y) &
+                    !is.na(FutureDist_5s))
+
+# Dataset A: WITH stationary vehicles
+data_with_stationary <- base_data
+
+# Dataset B: WITHOUT stationary vehicles
+data_no_stationary <- subset(base_data, Speed > 0)
+
+dim(data_with_stationary)
+dim(data_no_stationary)
+```
+
+```{r}
+library(caret)
+
+run_model <- function(dataset) {
+  
+  set.seed(123)
+  
+  n <- nrow(dataset)
+  train_index <- sample(1:n, size = 0.8*n)
+  
+  train <- dataset[train_index, ]
+  test  <- dataset[-train_index, ]
+  
+  control <- trainControl(method = "cv", number = 5)
+  
+  model <- train(
+    FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+    data = train,
+    method = "lm",
+    trControl = control
+  )
+  
+  # Test predictions
+  pred <- predict(model, newdata = test)
+  
+  # RMSE
+  rmse <- sqrt(mean((pred - test$FutureDist_5s)^2))
+  
+  # R-squared
+  rss <- sum((pred - test$FutureDist_5s)^2)
+  tss <- sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
+  r2 <- 1 - rss/tss
+  
+  return(list(
+    RMSE = rmse,
+    R2 = r2,
+    CV_Results = model$results
+  ))
+}
+```
+
+```{r}
+results_with <- run_model(data_with_stationary)
+results_without <- run_model(data_no_stationary)
+
+results_with
+results_without
+```
