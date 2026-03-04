@@ -1,0 +1,462 @@
+---
+title: "Waymo Project"
+output: html_document
+date: "2026-03-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Autonomous vehicles (AVs) must safely navigate dynamic urban environments involving vehicles, cyclists, and pedestrians. Two major challenges in this setting are detecting anomalous driving behavior and predicting short-term future motion of surrounding agents. 
+
+This project addresses both challenges using trajectory data derived from the Waymo Open Dataset. Specifically, we aim to:
+
+- Detect anomalous motion patterns using unsupervised learning.
+- Predict 5-second future displacement using supervised regression.
+- Compare results when stationary agents are included versus removed.
+
+Understanding both behavioral irregularities and short-term motion forecasting is critical in pedestrian-heavy, low-speed environments where proactive planning improves safety.
+
+---
+
+# State-of-the-Art
+
+Modern autonomous driving systems rely heavily on:
+
+- Trajectory forecasting models (Kalman Filters, LSTMs, Transformers)
+- Unsupervised anomaly detection (Isolation Forest, One-Class SVM)
+- Multi-agent interaction models
+
+Short-horizon forecasting (3–5 seconds) is often modeled using kinematic state variables. Isolation Forest remains widely used due to its scalability and minimal distributional assumptions.
+
+This project implements classical machine learning techniques to establish strong baseline performance before considering deep learning extensions.
+
+---
+
+# Materials and Methods
+
+## Dataset
+
+### A. Feature Extraction
+
+For each agent, kinematic features are extracted at the prediction horizon (t = 0) to capture the instantaneous motion state during periods of peak interaction density. These features describe both linear and angular motion dynamics.
+
+The feature set includes:
+
+- **Speed (v)**: Magnitude of the velocity vector (m/s).
+- **Acceleration (a)**: Rate of change of speed (m/s²).
+- **Yaw Rate (ψ̇)**: Angular velocity representing the rate of change of heading (rad/s).
+- **Lateral G-Force**: Computed as |v × ψ̇|, serving as a proxy for cornering intensity and lateral maneuver aggressiveness.
+
+These variables provide a compact yet expressive representation of instantaneous driving behavior and are used for both anomaly detection and motion prediction tasks.
+
+See python notebook steps 1-4 for preprocessing: https://github.com/pstepanovum/womd-unsupervised-anomaly-detection/blob/main/src/python/waymo.ipynb
+
+---
+
+### B. Tooling and Data Pipeline
+
+All statistical analysis, visualization, and modeling are performed in **R**. Python is used exclusively as a preprocessing tool to extract and structure the raw Waymo Motion Dataset into a tabular format suitable for statistical analysis.
+
+The processing pipeline follows these steps:
+
+1. Raw Waymo Motion Dataset extracted using Python.
+2. Relevant kinematic features structured into tabular format.
+3. Dataset exported as a comma-separated values (CSV) file.
+4. Statistical analysis, visualization, dimensionality reduction, and anomaly detection conducted entirely in R.
+
+This separation ensures reproducibility while leveraging Python for data engineering and R for statistical modeling and analysis.
+
+The dataset contains:
+
+- AgentType (Vehicle, Cyclist, Pedestrian)
+- Speed
+- Acceleration
+- YawRate
+- Velocity components (Vel_X, Vel_Y)
+- FutureDist_5s (5-second future displacement)
+
+### Pre-processing
+
+- Removed invalid frames (`Valid_Current != True`)
+- Removed missing values in predictors and target
+- Created two datasets:
+  - With stationary agents
+  - Without stationary agents (Speed > 0)
+- Converted categorical variables to factors
+- Split data 80% training / 20% test
+
+---
+
+## Methods
+
+### 1. Anomaly Detection (Unsupervised)
+
+Method:
+Isolation Forest (100 trees)
+
+Features:
+- Speed
+- Acceleration
+- YawRate
+
+Top 1% of anomaly scores were labeled as anomalous.
+
+Association between AgentType and anomaly was tested using Fisher’s Exact Test.
+
+---
+
+### 2. Motion Prediction (Supervised Regression)
+
+Target:
+FutureDist_5s
+
+Predictors:
+- Speed
+- Acceleration
+- YawRate
+- Vel_X
+- Vel_Y
+
+Method:
+Linear regression via caret.
+
+Two scenarios were evaluated:
+1. With stationary agents
+2. Without stationary agents
+
+---
+
+# Evaluation
+
+Dataset was split into:
+
+- 80% Training
+- 20% Test (Hold-out)
+
+5-fold cross-validation was performed on the training set.
+
+Metrics:
+
+Classification:
+- Confusion Matrix
+- ROC (AUC)
+- Sensitivity / Specificity
+
+Regression:
+- RMSE
+- R²
+
+---
+
+# Results
+
+## Descriptive Analysis
+
+When including stationary agents, vehicles showed artificially lower average speeds due to stopping behavior at intersections.
+
+After removing stationary agents:
+
+- Vehicles: ~6.74 m/s  
+- Cyclists: ~3.92 m/s  
+- Pedestrians: ~1.07 m/s  
+
+These values align with real-world expectations.
+
+---
+
+## Anomaly Detection Results
+
+Isolation Forest identified approximately 1% of observations as anomalous. These correspond to extreme acceleration, sharp yaw changes, or unusually high speeds.
+
+This supports the use of anomaly detection as a safety monitoring tool in AV systems.
+
+---
+
+## Motion Prediction Results
+
+Regression models demonstrated strong predictive performance for 5-second displacement.
+
+Removing stationary agents improved interpretability and reduced bias from zero-speed clustering.
+
+These findings suggest that short-term forecasting can be effectively achieved using current kinematic state variables.
+
+---
+
+# Discussion
+
+This project demonstrates that:
+
+- Kinematic features strongly determine short-term motion.
+- Isolation Forest effectively detects rare behavioral patterns.
+- Including stationary agents significantly alters descriptive statistics.
+- Combining anomaly detection with motion prediction provides a robust safety modeling framework.
+
+In pedestrian-heavy urban environments, anomaly detection flags irregular behavior while motion forecasting anticipates future positions. Together, they support proactive planning in autonomous vehicles.
+
+---
+
+# Code Implementation
+
+```{r}
+library(tidyverse)
+library(caret)
+library(isotree)
+library(e1071)
+library(randomForest)
+set.seed(42)
+```
+
+```{r}
+    # Load Data
+data<-read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")  
+cat("Total rows in raw dataset:", nrow(data))
+  
+```
+    
+    
+    
+```{r}
+# Pre-processing
+data_filtered <- data %>%
+  filter(Speed != 0)
+
+data_clean <- data_filtered %>%
+  filter(Valid_Current == "True") %>%
+  drop_na(Speed, Acceleration, YawRate, Length, Width)
+
+data_clean$AgentType <- as.factor(data_clean$AgentType)
+
+cat("Final cleaned dataset size:", nrow(data_clean))
+```
+
+``` {r}
+# Descriptive Analysis
+summary(data_clean$Speed)
+
+hist(data_clean$Speed,
+     main = "Vehicle Speed Distribution",
+     xlab = "Speed (m/s)",
+     col = "skyblue")
+
+speed_skewness <- skewness(data_clean$Speed)
+cat("Speed Skewness:", speed_skewness)
+
+accel_threshold <- quantile(data_clean$Acceleration, 0.99)
+cat("99th Percentile Acceleration:", accel_threshold)
+```
+
+
+
+``` {r}
+# Isolation Forest
+iso_model <- isolation.forest(
+  data_clean[, c("Speed", "Acceleration", "YawRate")],
+  ntrees = 100,
+  nthreads = 1
+)
+
+data_clean$AnomalyScore <- predict(
+  iso_model,
+  data_clean[, c("Speed", "Acceleration", "YawRate")]
+)
+
+score_threshold <- quantile(data_clean$AnomalyScore, 0.99)
+
+data_clean$Is_Anomaly <- as.factor(
+  ifelse(data_clean$AnomalyScore > score_threshold, "Yes", "No")
+)
+
+table(data_clean$Is_Anomaly)
+```
+
+``` {r}
+# Statistical Test
+contingency_table <- table(data_clean$AgentType,
+                           data_clean$Is_Anomaly)
+
+fisher_results <- fisher.test(contingency_table,
+                              simulate.p.value = TRUE)
+
+fisher_results
+```
+
+``` {r}
+# Train/Test Split
+trainIndex <- createDataPartition(data_clean$Is_Anomaly,
+                                  p = .8,
+                                  list = FALSE)
+
+train_data <- data_clean[trainIndex, ]
+test_data  <- data_clean[-trainIndex, ]
+```
+
+``` {r}
+# Handle Class Imbalance
+train_balanced <- downSample(
+  x = train_data[, c("Length", "Width", "YawRate")],
+  y = train_data$Is_Anomaly
+)
+
+names(train_balanced)[names(train_balanced) == "Class"] <- "Is_Anomaly"
+
+table(train_balanced$Is_Anomaly)
+```
+
+``` {r}
+# Random Forest Model
+fit_control <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+model_rf <- train(
+  Is_Anomaly ~ Length + Width + YawRate,
+  data = train_balanced,
+  method = "rf",
+  metric = "ROC",
+  trControl = fit_control
+)
+
+model_rf
+```
+
+``` {r}
+# Evaluation
+predictions <- predict(model_rf, test_data)
+
+conf_matrix <- confusionMatrix(predictions,
+                               test_data$Is_Anomaly)
+
+conf_matrix
+```
+
+
+#Linear Regression on Future Distance 5s: 
+
+```{r}
+model_data <- data[, c(
+  "AgentType",
+  "Speed",
+  "Acceleration",
+  "YawRate",
+  "Vel_X",
+  "Vel_Y",
+  "FutureDist_5s"
+)]
+
+# Remove rows missing FutureDist_5s
+model_data <- subset(model_data, !is.na(FutureDist_5s))
+
+```
+
+
+
+
+
+```{r}
+summary(model_data$Speed)
+summary(model_data$FutureDist_5s)
+
+aggregate(Speed ~ AgentType, data = model_data, mean)
+
+```
+
+```{r}
+
+moving_data <- subset(data, Speed > 0)
+
+aggregate(Speed ~ AgentType, data = moving_data, mean)
+```
+
+When including stationary agents, vehicles exhibited a lower mean speed than cyclists due to a high proportion of zero-velocity observations (e.g., vehicles stopped at intersections). After filtering for moving agents (Speed > 0), vehicles exhibited the highest average speed (6.74 m/s), followed by cyclists (3.92 m/s) and pedestrians (1.07 m/s), consistent with real-world expectations
+
+
+```{r}
+
+
+FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
+
+```
+
+```{r}
+# Base cleaned dataset (no NA in predictors or target)
+base_data <- subset(data, 
+                    !is.na(Speed) &
+                    !is.na(Acceleration) &
+                    !is.na(YawRate) &
+                    !is.na(Vel_X) &
+                    !is.na(Vel_Y) &
+                    !is.na(FutureDist_5s))
+
+# Dataset A: WITH stationary vehicles
+data_with_stationary <- base_data
+
+# Dataset B: WITHOUT stationary vehicles
+data_no_stationary <- subset(base_data, Speed > 0)
+
+dim(data_with_stationary)
+dim(data_no_stationary)
+
+```
+
+```{r}
+
+library(caret)
+
+run_model <- function(dataset) {
+  
+  set.seed(123)
+  
+  n <- nrow(dataset)
+  train_index <- sample(1:n, size = 0.8*n)
+  
+  train <- dataset[train_index, ]
+  test  <- dataset[-train_index, ]
+  
+  control <- trainControl(method = "cv", number = 5)
+  
+  model <- train(
+    FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+    data = train,
+    method = "lm",
+    trControl = control
+  )
+  
+  # Test predictions
+  pred <- predict(model, newdata = test)
+  
+  # RMSE
+  rmse <- sqrt(mean((pred - test$FutureDist_5s)^2))
+  
+  # R-squared
+  rss <- sum((pred - test$FutureDist_5s)^2)
+  tss <- sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
+  r2 <- 1 - rss/tss
+  
+  return(list(
+    RMSE = rmse,
+    R2 = r2,
+    CV_Results = model$results
+  ))
+}
+
+
+```
+
+
+```{r}
+
+results_with <- run_model(data_with_stationary)
+results_without <- run_model(data_no_stationary)
+
+results_with
+results_without
+```
+
+
