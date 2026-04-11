@@ -676,6 +676,84 @@ table(data_clean$Is_Anomaly)</code></pre>
 <pre><code>## 
 ##   No  Yes 
 ## 4492   46</code></pre>
+<pre class="r"><code># --- Who are the anomalous agents? ---
+anomalous_agents &lt;- data_clean %&gt;%
+  filter(Is_Anomaly == &quot;Yes&quot;) %&gt;%
+  select(ScenarioID, AgentID, AgentType, Speed, Acceleration, YawRate, Length, Width, AnomalyScore, IsInteractive) %&gt;%
+  arrange(desc(AnomalyScore))
+
+cat(&quot;Total anomalous agents flagged:&quot;, nrow(anomalous_agents), &quot;\n\n&quot;)</code></pre>
+<pre><code>## Total anomalous agents flagged: 46</code></pre>
+<pre class="r"><code>cat(&quot;=== Breakdown by Agent Type ===\n&quot;)</code></pre>
+<pre><code>## === Breakdown by Agent Type ===</code></pre>
+<pre class="r"><code>print(table(anomalous_agents$AgentType))</code></pre>
+<pre><code>## 
+##    Cyclist Pedestrian    Vehicle 
+##          1         16         29</code></pre>
+<pre class="r"><code>cat(&quot;\n=== Top 20 Most Anomalous Agents ===\n&quot;)</code></pre>
+<pre><code>## 
+## === Top 20 Most Anomalous Agents ===</code></pre>
+<pre class="r"><code>print(head(anomalous_agents, 20))</code></pre>
+<pre><code>##          ScenarioID AgentID  AgentType      Speed Acceleration     YawRate
+## 1  909244b878c6c203    1409    Vehicle 49.7522337  355.7765102   0.0486517
+## 2   5baef16beff3351    1554    Vehicle 24.9215469  230.9987003  30.6366062
+## 3  c014d3c05600714f     560    Vehicle 32.4343447  239.8659613  -0.3366148
+## 4  3eea09dc81191856     998    Vehicle  3.4746838   19.7094995  31.3370997
+## 5  bd094f42eeab6700     510 Pedestrian  9.5352089   88.6511891  -3.9872074
+## 6  cffef7d3778fc611    1265    Vehicle 17.0366753    0.0000000 -16.9537614
+## 7  2c4cec5c3ea292e2    2861    Vehicle  2.4566565   -4.5194379 -31.2079055
+## 8  27597bc952d2c9c7     891    Vehicle 14.4440623    0.0000000  15.6420417
+## 9  2f8f82f1072ad710      55    Vehicle  0.2344259   -8.3543391 -30.9017069
+## 10 262112a66742fe8d    1478    Vehicle  5.1041841  -31.3226886  14.8376394
+## 11 d3fd8cb194ea76f6    1093    Vehicle  2.3305509    0.0000000 -30.9164745
+## 12 262112a66742fe8d    3661 Pedestrian  0.9353263    0.0000000  31.2191040
+## 13 e62ae31ead55e09c    1150 Pedestrian  0.8380400 -106.5408093   0.0500226
+## 14 308716b64a079919    1571    Vehicle  0.7276466    3.8814288 -31.3147648
+## 15  4ba6349a3b92285    1497 Pedestrian  0.4322392    3.4933920  30.9624312
+## 16 a2cf10457974619a     177 Pedestrian  0.3304477    2.6002682  31.0119111
+## 17 d4a4aac0a880c4a1    2575    Vehicle  0.3930588   -2.1867789 -31.3890439
+## 18 bec74a69a06a8a83     408    Cyclist  0.1091830   -0.3988279 -31.0356641
+## 19 12d5ce1b476aa6d4    3729 Pedestrian  2.3771325   19.7300782 -15.1833677
+## 20 e62ae31ead55e09c    1148 Pedestrian  0.6068073    4.0429935 -31.3949854
+##       Length     Width AnomalyScore IsInteractive
+## 1  9.8503294 3.0832551    0.8697597         False
+## 2  4.6620517 2.0523481    0.8533328         False
+## 3  4.6635671 2.0496674    0.8037976         False
+## 4  4.9209399 2.1334965    0.7599397         False
+## 5  0.9076484 0.8796701    0.7481019         False
+## 6  4.5048909 2.0216241    0.7479748         False
+## 7  5.2336521 2.3184812    0.7304394         False
+## 8  4.4785609 2.0140638    0.7266007         False
+## 9  4.6459408 2.0733004    0.7198844         False
+## 10 4.7604127 2.1188598    0.7194552         False
+## 11 4.5462894 2.0140662    0.7149985         False
+## 12 0.8865285 0.8187622    0.7060896         False
+## 13 0.9142446 0.8685623    0.6984288         False
+## 14 4.8966894 2.1486998    0.6980094         False
+## 15 0.8424865 0.8570212    0.6948457         False
+## 16 0.8585473 0.9230940    0.6937898         False
+## 17 4.7121091 2.0427628    0.6925208         False
+## 18 1.8680472 0.8491113    0.6922654         False
+## 19 0.8083727 0.7867577    0.6920339         False
+## 20 0.9086512 0.8855422    0.6880920         False</code></pre>
+<pre class="r"><code>cat(&quot;\n=== Summary Statistics of Anomalous Agents ===\n&quot;)</code></pre>
+<pre><code>## 
+## === Summary Statistics of Anomalous Agents ===</code></pre>
+<pre class="r"><code>print(summary(anomalous_agents[, c(&quot;Speed&quot;, &quot;Acceleration&quot;, &quot;YawRate&quot;, &quot;AnomalyScore&quot;)]))</code></pre>
+<pre><code>##      Speed          Acceleration         YawRate           AnomalyScore   
+##  Min.   : 0.0594   Min.   :-106.541   Min.   :-31.39499   Min.   :0.5570  
+##  1st Qu.: 0.4509   1st Qu.:  -3.506   1st Qu.:-12.70125   1st Qu.:0.5924  
+##  Median : 3.1044   Median :   0.000   Median : -0.04822   Median :0.6486  
+##  Mean   :10.6504   Mean   :  21.131   Mean   : -2.09286   Mean   :0.6583  
+##  3rd Qu.:20.4573   3rd Qu.:  30.414   3rd Qu.:  0.28159   3rd Qu.:0.7042  
+##  Max.   :49.7522   Max.   : 355.777   Max.   : 31.33710   Max.   :0.8698</code></pre>
+<pre class="r"><code>cat(&quot;\n=== What % of anomalous agents are flagged as Interactive by Waymo? ===\n&quot;)</code></pre>
+<pre><code>## 
+## === What % of anomalous agents are flagged as Interactive by Waymo? ===</code></pre>
+<pre class="r"><code>print(prop.table(table(anomalous_agents$IsInteractive)))</code></pre>
+<pre><code>## 
+## False 
+##     1</code></pre>
 <pre class="r"><code># Statistical Test
 contingency_table &lt;- table(data_clean$AgentType,
                            data_clean$Is_Anomaly)

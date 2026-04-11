@@ -277,6 +277,28 @@ table(data_clean$Is_Anomaly)
 ```
 
 ``` {r}
+# --- Who are the anomalous agents? ---
+anomalous_agents <- data_clean %>%
+  filter(Is_Anomaly == "Yes") %>%
+  select(ScenarioID, AgentID, AgentType, Speed, Acceleration, YawRate, Length, Width, AnomalyScore, IsInteractive) %>%
+  arrange(desc(AnomalyScore))
+
+cat("Total anomalous agents flagged:", nrow(anomalous_agents), "\n\n")
+
+cat("=== Breakdown by Agent Type ===\n")
+print(table(anomalous_agents$AgentType))
+
+cat("\n=== Top 20 Most Anomalous Agents ===\n")
+print(head(anomalous_agents, 20))
+
+cat("\n=== Summary Statistics of Anomalous Agents ===\n")
+print(summary(anomalous_agents[, c("Speed", "Acceleration", "YawRate", "AnomalyScore")]))
+
+cat("\n=== What % of anomalous agents are flagged as Interactive by Waymo? ===\n")
+print(prop.table(table(anomalous_agents$IsInteractive)))
+```
+
+``` {r}
 # Statistical Test
 contingency_table <- table(data_clean$AgentType,
                            data_clean$Is_Anomaly)

@@ -1,0 +1,55 @@
+Top 20 Most Anomalous Agents - Isolation Forest (99th Percentile Threshold)
+Generated from: Waymo Open Motion Dataset v1.3.1 (300 scenarios, validation split)
+Model: Isolation Forest, 100 trees, features: Speed, Acceleration, YawRate
+==========================================================================
+
+ScenarioID        AgentID  AgentType   Speed        Acceleration  YawRate      Length     Width      AnomalyScore  IsInteractive
+909244b878c6c203  1409     Vehicle     49.7522337   355.7765102    0.0486517   9.8503294  3.0832551  0.8697597     False
+5baef16beff3351   1554     Vehicle     24.9215469   230.9987003   30.6366062   4.6620517  2.0523481  0.8533328     False
+c014d3c05600714f  560      Vehicle     32.4343447   239.8659613   -0.3366148   4.6635671  2.0496674  0.8037976     False
+3eea09dc81191856  998      Vehicle      3.4746838    19.7094995   31.3370997   4.9209399  2.1334965  0.7599397     False
+bd094f42eeab6700  510      Pedestrian   9.5352089    88.6511891   -3.9872074   0.9076484  0.8796701  0.7481019     False
+cffef7d3778fc611  1265     Vehicle     17.0366753     0.0000000  -16.9537614   4.5048909  2.0216241  0.7479748     False
+2c4cec5c3ea292e2  2861     Vehicle      2.4566565    -4.5194379  -31.2079055   5.2336521  2.3184812  0.7304394     False
+27597bc952d2c9c7  891      Vehicle     14.4440623     0.0000000   15.6420417   4.4785609  2.0140638  0.7266007     False
+2f8f82f1072ad710  55       Vehicle      0.2344259    -8.3543391  -30.9017069   4.6459408  2.0733004  0.7198844     False
+262112a66742fe8d  1478     Vehicle      5.1041841   -31.3226886   14.8376394   4.7604127  2.1188598  0.7194552     False
+d3fd8cb194ea76f6  1093     Vehicle      2.3305509     0.0000000  -30.9164745   4.5462894  2.0140662  0.7149985     False
+262112a66742fe8d  3661     Pedestrian   0.9353263     0.0000000   31.2191040   0.8865285  0.8187622  0.7060896     False
+e62ae31ead55e09c  1150     Pedestrian   0.8380400  -106.5408093    0.0500226   0.9142446  0.8685623  0.6984288     False
+308716b64a079919  1571     Vehicle      0.7276466     3.8814288  -31.3147648   4.8966894  2.1486998  0.6980094     False
+4ba6349a3b92285   1497     Pedestrian   0.4322392     3.4933920   30.9624312   0.8424865  0.8570212  0.6948457     False
+a2cf10457974619a  177      Pedestrian   0.3304477     2.6002682   31.0119111   0.8585473  0.9230940  0.6937898     False
+d4a4aac0a880c4a1  2575     Vehicle      0.3930588    -2.1867789  -31.3890439   4.7121091  2.0427628  0.6925208     False
+bec74a69a06a8a83  408      Cyclist      0.1091830    -0.3988279  -31.0356641   1.8680472  0.8491113  0.6922654     False
+12d5ce1b476aa6d4  3729     Pedestrian   2.3771325    19.7300782  -15.1833677   0.8083727  0.7867577  0.6920339     False
+e62ae31ead55e09c  1148     Pedestrian   0.6068073     4.0429935  -31.3949854   0.9086512  0.8855422  0.6880920     False
+
+==========================================================================
+KEY OBSERVATIONS
+==========================================================================
+
+Top anomaly (ScenarioID: 909244b878c6c203, AgentID: 1409):
+  - Vehicle travelling at 49.75 m/s (~180 km/h) with extreme acceleration (355.78 m/s²)
+  - Near-zero yaw rate — driving extremely fast in a straight line
+  - Flagged purely due to extreme speed + acceleration outlier
+
+YawRate-dominant anomalies (rows 2, 4, 7, 9, 11, 12, 14, 15, 16, 17, 18, 20):
+  - YawRate values near ±31 rad/s — physically extreme rotation rates
+  - Many of these are near-stationary agents (Speed < 3 m/s)
+  - Likely sensor noise or a data artifact — worth investigating in Python visualization
+
+Pedestrian anomalies (rows 5, 12, 13, 15, 16, 19, 20):
+  - Row 5: Pedestrian moving at 9.5 m/s (~34 km/h) — far beyond normal walking/running speed
+  - Row 13: Near-zero speed but acceleration of -106.5 m/s² — extreme deceleration artifact
+  - Most others flagged due to extreme YawRate at near-zero speed
+
+IsInteractive = False for ALL top 20:
+  - None of the top 20 were flagged by Waymo as safety-critical interactions
+  - Suggests the top anomalies may be sensor artifacts / data noise rather than genuine dangerous behavior
+  - Look further down the anomalous list (beyond top 20) for IsInteractive = True cases
+
+==========================================================================
+To visualize a scenario in the Python notebook (src/python/waymo.ipynb):
+  TARGET_ID = '<ScenarioID>'   # paste ScenarioID here
+==========================================================================
