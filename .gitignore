@@ -8,3 +8,6 @@
 *.aux
 __pycache__/
 .DS_Store
+CLAUDE.md
+docs/presentation/*.md
+
