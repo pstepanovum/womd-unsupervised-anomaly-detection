@@ -202,11 +202,6 @@ In pedestrian-heavy urban environments, anomaly detection flags irregular behavi
 # Code Implementation
 
 ```{r}
-required_packages <- c("tidyverse", "caret", "isotree", "e1071",
-                        "randomForest", "pdp", "car", "gridExtra")
-new_packages <- required_packages[!required_packages %in% installed.packages()[, "Package"]]
-if (length(new_packages)) install.packages(new_packages)
-
 library(tidyverse)
 library(caret)
 library(isotree)
