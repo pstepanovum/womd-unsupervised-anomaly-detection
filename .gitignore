@@ -3,7 +3,6 @@
 *.RData
 
 # Outputs
-*.mp4
 *.log
 *.aux
 __pycache__/
