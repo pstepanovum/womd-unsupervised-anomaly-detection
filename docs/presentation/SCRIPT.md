@@ -89,6 +89,8 @@
 
 > Our anomaly detection pipeline has three layers.
 >
+> Before we get into the model itself, a word on feature selection — because it's motivated by the EDA. Pearson correlation across all kinematic features shows that yaw rate is essentially independent of everything else: |r| ≤ 0.09 with every other feature. Speed and size have a weak relationship. Length and width are almost perfectly redundant. Yaw rate stands alone. That makes it the natural discriminating signal for anomaly detection — it's the one feature that carries information the others don't.
+>
 > **Layer 1: Isolation Forest.**
 > The intuition is elegant: anomalous points are rare and different, so they get isolated in fewer random tree splits than normal points. We fit a forest of 100 trees on three kinematic features — speed, acceleration, and yaw rate. Each agent gets an anomaly score between 0 and 1. We flag the top 1% — the 99th percentile — as anomalous. That gives us **46 flagged agents out of 4,538**.
 >
@@ -128,12 +130,20 @@
 > When you look at raw mean speeds including stationary agents, vehicles appear slower than cyclists — counterintuitive. That's because a huge proportion of vehicles are stopped at intersections. Once we restrict to moving agents, the expected ordering is restored: vehicles at 6.74 m/s, cyclists at 3.92 m/s, pedestrians at 1.07 m/s. This is an important preprocessing lesson — **stationary agents can systematically bias your statistics**.
 >
 > **Anomaly Detection.**
-> Isolation Forest flagged 46 agents — exactly 1% by design. Fisher's Exact Test: p = 0.0005. The anomalies cluster in specific agent types. Our Random Forest classifier, trained on those pseudo-labels, achieved:
+> Isolation Forest flagged 46 agents — exactly 1% by design. Fisher's Exact Test: p = 0.0005. The anomalies are not uniformly distributed across agent types — that's signal, not noise.
+>
+> We manually inspected the top 20. They fall into two distinct categories.
+>
+> The first is genuine behavioral anomalies — three agents with speeds between 25 and 50 meters per second. One reaches 180 km/h with an acceleration reading over 350 m/s². These are real outliers, well outside the normal operating range for urban driving.
+>
+> The second category is a sensor artifact — and this is arguably the more important finding. Seventeen of the top 20 are near-stationary agents flagged for a yaw rate of ±31 rad/s. A rotation rate of 31 radians per second is physically impossible for any ground vehicle. The pattern is unmistakable: near-zero speed, same magnitude, across all three agent types. This is numerical instability in the heading derivative computation at near-zero speed. These are data quality issues, not dangerous behavior — and we would not have caught them without the anomaly detection step.
+>
+> Our Random Forest classifier, trained on those pseudo-labels, achieved:
 > - Cross-validated AUC-ROC of **0.887**
 > - Sensitivity of 0.836, Specificity of 0.839 on training
 > - On the held-out test set: accuracy of 79.5%, balanced accuracy of 73.1%
 >
-> That's strong performance given that we're training on noisy, unsupervised pseudo-labels rather than ground truth.
+> That's strong performance given that we're training on noisy, unsupervised pseudo-labels rather than verified ground truth.
 >
 > **Motion Prediction.**
 > Here's the most striking result. With stationary agents included: test RMSE of **7.44 meters**, R-squared of **0.880**. A linear model. Five features. That's a very strong fit.
@@ -151,6 +161,8 @@
 > First, **unsupervised anomaly detection works** — and we can validate it statistically. The Fisher test tells us the Isolation Forest isn't just picking random points. The structure of anomalies correlates with agent type in a meaningful way. Pedestrians and cyclists exhibit more irregular kinematics, and the model captures that.
 >
 > Second, **dataset composition matters enormously**. The 15-point drop in R-squared when removing stationary agents is not a model failure — it's a dataset artifact. Any evaluation metric reported on a mixed moving-and-stationary population is likely inflated. This has direct implications for how AV research benchmarks should be constructed.
+>
+> Third — and we want to be upfront about this — **the dominant features in each model are exactly what you'd expect**. Yaw rate drives the anomaly detection: it's orthogonal to every other feature, so it carries the most independent signal for flagging unusual behavior. Speed drives the regression: if you want to know how far an agent travels in five seconds, velocity is basically the answer by definition. Neither of these is surprising. But that's the point — the EDA and the models agree with physical intuition, which is exactly the sanity check you want before trusting any unsupervised pipeline on real-world safety data. The two models are also asking fundamentally different questions: the Isolation Forest asks *is this agent behaving unusually*, the regression asks *where will it go*. Yaw rate and speed are the right tools for those respective questions.
 >
 > On limitations: the 46 anomaly labels we use to train the Random Forest are pseudo-labels — they come from an unsupervised score, not verified ground truth. The test specificity of 0.667 on the anomalous class reflects that noise. We also work from a single snapshot frame per agent, ignoring the full 20-second trajectory — which is a significant loss of information. And our regression model is linear; the true dynamics of pedestrian motion especially may be nonlinear.
 

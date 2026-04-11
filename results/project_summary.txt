@@ -54,14 +54,14 @@ STEP 1 — EDA: YAW RATE STANDS ALONE
 ==========================================================================
 
 Pearson correlations across all features show that yaw rate is essentially
-uncorrelated with everything else (r ≤ 0.09). Speed and size have a weak
-positive relationship (r ≈ 0.28). Agent length and width are nearly redundant
-(r = 0.97).
+uncorrelated with everything else (|r| ≤ 0.09). Speed and agent size share
+a weak positive relationship (r ≈ 0.28). Agent length and width are nearly
+redundant (r = 0.97).
 
-What this means: yaw rate is the only feature that captures something the
-others do not — how much an agent is turning, independent of how fast or
-how large it is. This makes it the natural primary signal for the Isolation
-Forest in the next step.
+What this means: yaw rate is the only feature that carries independent
+information — it captures turning behavior without overlapping with speed,
+size, or any other kinematic signal. This makes it the natural discriminating
+feature for the Isolation Forest in the next step.
 
 ==========================================================================
 STEP 2 — ISOLATION FOREST: ANOMALY DETECTION
