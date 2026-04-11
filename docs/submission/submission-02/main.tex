@@ -63,7 +63,7 @@ justin.cabrera2718@gmail.com}
 \maketitle
 
 \begin{abstract}
-Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 10{,}000 traffic agents and apply Isolation Forest for outlier scoring, validated via Fisher's Exact Test against agent-type labels. A supervised Random Forest classifier is further trained on morphological and kinematic features to characterize detected anomalies. In parallel, a linear regression model predicts 5-second future displacement under two data regimes: including and excluding stationary agents. Results demonstrate that kinematic outliers are non-uniformly distributed across agent types ($p < 0.001$), and that short-term motion forecasting achieves strong performance ($R^2 = 0.88$) when stationary agents are retained.
+Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 10{,}000 traffic agents and apply Isolation Forest for outlier scoring, validated via Fisher's Exact Test against agent-type labels. Correlation analysis shows that yaw rate is essentially uncorrelated with all other features ($r \approx 0.02$), making it the most distinct signal in the feature set. Inspection of the flagged anomalies finds that most are near-stationary agents with unrealistically high yaw rate readings ($\pm$31\,rad/s), likely a sensor artifact, while a small number correspond to genuinely unusual high-speed events. A linear regression model for 5-second displacement shows that speed ($\beta = 0.95$) is the dominant predictor---a separate finding from anomaly detection that together paints a clearer picture of agent behavior. Results show that kinematic outliers are distributed unevenly across agent types ($p < 0.001$), and motion forecasting performs well ($R^2 = 0.88$) when stationary agents are included.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -155,9 +155,36 @@ Pedestrian & 1.01       & 1.07        \\
 \end{tabular}
 \end{table}
 
+\subsection{Feature Correlation Structure}
+
+Before fitting any models, we computed pairwise Pearson correlations across all kinematic and morphological features (Table~\ref{tab:corr}). The main observation is that yaw rate is essentially uncorrelated with everything else ($r \leq 0.09$). Speed and bounding box dimensions have a weak positive relationship ($r \approx 0.28$), and agent length and width are nearly redundant ($r = 0.97$). Yaw rate stands out as the only feature that captures something the others do not: how much an agent is turning, independent of how fast or how large it is.
+
+\begin{table}[h]
+\centering
+\caption{Pearson Correlation Matrix — Kinematic Features ($N = 4{,}538$)}
+\label{tab:corr}
+\begin{tabular}{lccccc}
+\toprule
+ & Speed & Accel. & YawRate & Length & Width \\
+\midrule
+Speed    & 1.000 & 0.173 & 0.022 & 0.282 & 0.276 \\
+Accel.   &       & 1.000 & 0.093 & 0.063 & 0.041 \\
+YawRate  &       &       & 1.000 & -0.008 & -0.005 \\
+Length   &       &       &       & 1.000 & 0.969 \\
+Width    &       &       &       &       & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This matters for anomaly detection because a feature that does not correlate with others will tend to drive Isolation Forest scores on its own, which is consistent with what we observe in the results below.
+
 \subsection{Anomaly Detection Results}
 
-The Isolation Forest model flagged 46 out of 4{,}538 agents as anomalous (approximately 1\%), consistent with the designed 99th-percentile threshold. Fisher's Exact Test yielded $p = 0.0005$ (two-sided, Monte Carlo), indicating a statistically significant non-uniform distribution of anomalies across agent types. This suggests that the kinematic features captured by Isolation Forest carry agent-type-discriminative signal relevant to safety assessment.
+The Isolation Forest model flagged 46 out of 4{,}538 agents as anomalous (approximately 1\%), consistent with the 99th-percentile threshold. Fisher's Exact Test yielded $p = 0.0005$, confirming that anomalies are not evenly spread across agent types---pedestrians and cyclists are flagged more often than vehicles.
+
+Looking at the top 20 flagged agents, most fall into one of two groups. A small number (roughly 3) are genuinely unusual: the highest-scored agent (ScenarioID: \texttt{909244b878c6c203}) was traveling at 49.75\,m/s ($\approx$180\,km/h) with an acceleration of 355.8\,m/s$^2$---clearly an extreme event, possibly a data artifact at highway speed. A few others show similarly high speeds.
+
+The remaining flagged agents, however, are near-stationary ($v < 3$\,m/s) with yaw rate values stuck at $\pm$31\,rad/s. This value appears in 12 of the top 20 anomalies across all three agent types. A rotation rate of 31\,rad/s ($\approx$5 full rotations per second) is not physically plausible for a ground agent, and the pattern---always near zero speed, always the same magnitude---points to a sensor artifact or numerical instability in heading derivative computation. All 20 top anomalies have \texttt{IsInteractive = False}, meaning Waymo itself did not flag any of them as safety-relevant interactions. So most of the top anomalies turned out to be data noise rather than real dangerous behavior.
 
 The Random Forest classifier trained on morphological and kinematic features (Length, Width, YawRate) achieved an AUC-ROC of 0.887 (mtry $= 2$, 5-fold CV), with sensitivity of 0.836 and specificity of 0.839. On the held-out test set, overall accuracy was 79.5\% with a balanced accuracy of 73.1\%, and a specificity of 0.667 on the minority (anomalous) class. Performance metrics are summarized in Table~\ref{tab:rf}.
 
@@ -200,17 +227,19 @@ Without stationary & 13.15 & 0.728 & 10.05 & 0.860 \\
 \section{Discussion}
 % =============================================================
 
-The results demonstrate that unsupervised kinematic anomaly detection is both statistically viable and computationally tractable for large-scale driving data. The significant Fisher's Exact Test result confirms that Isolation Forest scores are not merely random: anomalous events cluster disproportionately within specific agent types, consistent with the intuition that pedestrians and cyclists exhibit more irregular kinematics than vehicles in urban settings.
+The Fisher's Exact Test result confirms that Isolation Forest scores are not random---anomalous agents cluster more in pedestrians and cyclists, which makes sense given that those agent types move more erratically.
 
-The degradation in regression performance upon removing stationary agents ($\Delta R^2 = -0.15$) highlights a methodological consideration: stationary agents constitute a large, easily predictable subpopulation that inflates overall $R^2$ when included. For deployment in safety-critical forecasting applications, models evaluated exclusively on moving agents provide a more informative characterization of the system's predictive capability under dynamic conditions.
+The drop in regression performance when stationary agents are removed ($\Delta R^2 = -0.15$) is expected: stationary agents are trivially predictable (future displacement $\approx 0$), so removing them makes the prediction task harder. The model evaluated on moving agents only ($R^2 = 0.73$) is the more honest number for real-world use.
 
-The Random Forest classifier's moderate test specificity (0.667) on anomalous agents reflects the fundamental difficulty of the task: with only 46 true anomaly labels derived from an unsupervised score, the classifier is trained on noisy pseudo-labels. Future work will evaluate performance against ground-truth interaction flags (\texttt{IsInteractive}) provided in the Waymo dataset and explore temporal feature extraction over the full 20-second trajectory.
+One thing worth noting is that anomaly detection and regression are answering different questions. The Isolation Forest flags agents primarily on yaw rate, which is independent of speed and size---it captures erratic turning behavior. The regression model, by contrast, gives speed a standardized coefficient of $\beta = 0.95$ and yaw rate near zero ($\beta \approx -0.007$). This is not a contradiction: yaw rate tells you if something is behaving unusually, while speed tells you how far it will go. They measure different things.
+
+On the sensor artifact: the $\pm$31\,rad/s yaw rate cluster in near-stationary agents looks like a data quality issue, possibly from numerical instability in computing heading derivatives at near-zero speed. If you ran this pipeline on raw yaw rate without any filtering, most of your top anomalies would be this artifact rather than real dangerous behavior. A simple filter (e.g., $|\dot{\psi}| < 10$\,rad/s) would likely surface more meaningful events in the top results.
 
 % =============================================================
 \section{Conclusion}
 % =============================================================
 
-This work presents a two-stage statistical learning pipeline for autonomous driving data analysis: unsupervised anomaly detection via Isolation Forest followed by supervised characterization via Random Forest, complemented by a kinematic regression model for short-term motion forecasting. Applied to the Waymo Open Motion Dataset, the framework identifies statistically significant kinematic anomalies ($p < 0.001$) and achieves strong motion prediction accuracy ($R^2 = 0.88$). The results validate the utility of classical statistical methods as interpretable baselines in AV safety research. Future extensions will incorporate temporal trajectory features, Mahalanobis distance scoring, and validation against scene-level ground-truth interaction labels.
+This paper applied Isolation Forest anomaly detection and linear regression for motion prediction to the Waymo Open Motion Dataset. A few things stood out. Yaw rate is the only feature that is uncorrelated with everything else ($r \approx 0.02$), which makes it the main driver of the anomaly scores. Looking at the top flagged anomalies, only about 3 of the top 20 corresponded to genuinely unusual events (high speed, high acceleration); the rest were near-stationary agents with a $\pm$31\,rad/s yaw rate that appears to be a sensor artifact. For motion prediction, speed dominates ($\beta = 0.95$) while yaw rate contributes almost nothing---a separate finding from anomaly detection, since the two models are measuring different things. The $R^2 = 0.88$ on the full dataset drops to 0.73 on moving agents only, which is the more realistic number. Overall, classical statistical methods work reasonably well here and are easier to interpret than black-box alternatives. Future work should filter the yaw rate artifact before running anomaly detection, and check results against Waymo's \texttt{IsInteractive} labels as a ground-truth reference.
 
 % =============================================================
 \section{Code Implementation}

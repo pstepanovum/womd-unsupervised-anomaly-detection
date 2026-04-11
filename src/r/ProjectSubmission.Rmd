@@ -5,20 +5,18 @@ date: "2026-03-03"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
-##Test
+
 # Introduction
 
-Autonomous vehicles (AVs) must safely navigate dynamic urban environments involving vehicles, cyclists, and pedestrians. Two major challenges in this setting are detecting anomalous driving behavior and predicting short-term future motion of surrounding agents. 
+Autonomous vehicles (AVs) must safely navigate dynamic urban environments involving vehicles, cyclists, and pedestrians. Two major challenges in this setting are detecting anomalous driving behavior and predicting short-term future motion of surrounding agents.
 
 This project addresses both challenges using trajectory data derived from the Waymo Open Dataset. Specifically, we aim to:
 
 - Detect anomalous motion patterns using unsupervised learning.
 - Predict 5-second future displacement using supervised regression.
 - Compare results when stationary agents are included versus removed.
-
-Understanding both behavioral irregularities and short-term motion forecasting is critical in pedestrian-heavy, low-speed environments where proactive planning improves safety.
 
 ---
 
@@ -32,170 +30,29 @@ Modern autonomous driving systems rely heavily on:
 
 Short-horizon forecasting (3–5 seconds) is often modeled using kinematic state variables. Isolation Forest remains widely used due to its scalability and minimal distributional assumptions.
 
-This project implements classical machine learning techniques to establish strong baseline performance before considering deep learning extensions.
-
 ---
 
 # Materials and Methods
 
 ## Dataset
 
-### A. Feature Extraction
-
-For each agent, kinematic features are extracted at the prediction horizon (t = 0) to capture the instantaneous motion state during periods of peak interaction density. These features describe both linear and angular motion dynamics.
-
-The feature set includes:
+For each agent, kinematic features are extracted at the prediction horizon (t = 0). The feature set includes:
 
 - **Speed (v)**: Magnitude of the velocity vector (m/s).
 - **Acceleration (a)**: Rate of change of speed (m/s²).
 - **Yaw Rate (ψ̇)**: Angular velocity representing the rate of change of heading (rad/s).
-- **Lateral G-Force**: Computed as |v × ψ̇|, serving as a proxy for cornering intensity and lateral maneuver aggressiveness.
 
-These variables provide a compact yet expressive representation of instantaneous driving behavior and are used for both anomaly detection and motion prediction tasks.
+## Pipeline
 
-See python notebook steps 1-4 for preprocessing: https://github.com/pstepanovum/womd-unsupervised-anomaly-detection/blob/main/src/python/waymo.ipynb
+1. Raw Waymo Motion Dataset extracted using Python (see `src/python/waymo.ipynb`).
+2. Dataset exported as CSV.
+3. Correlation EDA → Isolation Forest anomaly detection → Linear regression for motion prediction.
 
----
-
-### B. Tooling and Data Pipeline
-
-All statistical analysis, visualization, and modeling are performed in **R**. Python is used exclusively as a preprocessing tool to extract and structure the raw Waymo Motion Dataset into a tabular format suitable for statistical analysis.
-
-The processing pipeline follows these steps:
-
-1. Raw Waymo Motion Dataset extracted using Python.
-2. Relevant kinematic features structured into tabular format.
-3. Dataset exported as a comma-separated values (CSV) file.
-4. Statistical analysis, visualization, dimensionality reduction, and anomaly detection conducted entirely in R.
-
-This separation ensures reproducibility while leveraging Python for data engineering and R for statistical modeling and analysis.
-
-The dataset contains:
-
-- AgentType (Vehicle, Cyclist, Pedestrian)
-- Speed
-- Acceleration
-- YawRate
-- Velocity components (Vel_X, Vel_Y)
-- FutureDist_5s (5-second future displacement)
-
-### Pre-processing
+## Pre-processing
 
 - Removed invalid frames (`Valid_Current != True`)
-- Removed missing values in predictors and target
-- Created two datasets:
-  - With stationary agents
-  - Without stationary agents (Speed > 0)
-- Converted categorical variables to factors
-- Split data 80% training / 20% test
-
----
-
-## Methods
-
-### 1. Anomaly Detection (Unsupervised)
-
-Method:
-Isolation Forest (100 trees)
-
-Features:
-- Speed
-- Acceleration
-- YawRate
-
-Top 1% of anomaly scores were labeled as anomalous.
-
-Association between AgentType and anomaly was tested using Fisher’s Exact Test.
-
----
-
-### 2. Motion Prediction (Supervised Regression)
-
-Target:
-FutureDist_5s
-
-Predictors:
-- Speed
-- Acceleration
-- YawRate
-- Vel_X
-- Vel_Y
-
-Method:
-Linear regression via caret.
-
-Two scenarios were evaluated:
-1. With stationary agents
-2. Without stationary agents
-
----
-
-# Evaluation
-
-Dataset was split into:
-
-- 80% Training
-- 20% Test (Hold-out)
-
-5-fold cross-validation was performed on the training set.
-
-Metrics:
-
-Classification:
-- Confusion Matrix
-- ROC (AUC)
-- Sensitivity / Specificity
-
-Regression:
-- RMSE
-- R²
-
----
-
-# Results
-
-## Descriptive Analysis
-
-When including stationary agents, vehicles showed artificially lower average speeds due to stopping behavior at intersections.
-
-After removing stationary agents:
-
-- Vehicles: ~6.74 m/s  
-- Cyclists: ~3.92 m/s  
-- Pedestrians: ~1.07 m/s  
-
-These values align with real-world expectations.
-
----
-
-## Anomaly Detection Results
-
-Isolation Forest identified approximately 1% of observations as anomalous. These correspond to extreme acceleration, sharp yaw changes, or unusually high speeds.
-
-This supports the use of anomaly detection as a safety monitoring tool in AV systems.
-
----
-
-## Motion Prediction Results
-
-Regression models demonstrated strong predictive performance for 5-second displacement.
-
-Removing stationary agents improved interpretability and reduced bias from zero-speed clustering.
-
-These findings suggest that short-term forecasting can be effectively achieved using current kinematic state variables.
-
----
-
-# Discussion
-
-This project demonstrates that:
-
-- Kinematic features strongly determine short-term motion.
-- Isolation Forest effectively detects rare behavioral patterns.
-- Including stationary agents significantly alters descriptive statistics.
-- Combining anomaly detection with motion prediction provides a robust safety modeling framework.
-
-In pedestrian-heavy urban environments, anomaly detection flags irregular behavior while motion forecasting anticipates future positions. Together, they support proactive planning in autonomous vehicles.
+- Removed stationary agents (`Speed > 0`)
+- Removed missing values in predictors
 
 ---
 
@@ -206,59 +63,105 @@ library(tidyverse)
 library(caret)
 library(isotree)
 library(e1071)
-library(randomForest)
-library(pdp)
-library(car)
 library(gridExtra)
+library(car)
 set.seed(42)
 ```
 
 ```{r}
-    # Load Data
-data<-read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")  
-cat("Total rows in raw dataset:", nrow(data))
-  
+data <- read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")
+cat("Total rows in raw dataset:", nrow(data), "\n")
 ```
-    
-    
-    
+
 ```{r}
 # Pre-processing
-data_filtered <- data %>%
-  filter(Speed != 0)
-
-data_clean <- data_filtered %>%
+data_clean <- data %>%
+  filter(Speed != 0) %>%
   filter(Valid_Current == "True") %>%
   drop_na(Speed, Acceleration, YawRate, Length, Width)
 
 data_clean$AgentType <- as.factor(data_clean$AgentType)
-
-cat("Final cleaned dataset size:", nrow(data_clean))
+cat("Final cleaned dataset size:", nrow(data_clean), "\n")
 ```
 
-``` {r}
-# Descriptive Analysis
-summary(data_clean$Speed)
+---
+
+# 1. Correlation EDA
+
+*Starting with EDA to understand feature relationships before modeling.*
+
+```{r}
+kinematic_vars <- c("Speed", "Acceleration", "YawRate", "Length", "Width")
+cor_matrix <- cor(data_clean[, kinematic_vars], use = "complete.obs")
+cat("=== Pearson Correlation Matrix ===\n")
+print(round(cor_matrix, 3))
+```
+
+```{r}
+# Correlation heatmap
+cor_df <- as.data.frame(cor_matrix) %>%
+  rownames_to_column("Var1") %>%
+  pivot_longer(-Var1, names_to = "Var2", values_to = "Correlation")
+
+ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = round(Correlation, 2)), size = 3.5, fontface = "bold") +
+  scale_fill_gradient2(low = "tomato", mid = "white", high = "steelblue",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(title = "Feature Correlation Heatmap — All Agent Types",
+       subtitle = "YawRate is near-zero correlated with all other features",
+       x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Pairs scatter plot — colored by AgentType
+pairs(data_clean[, kinematic_vars],
+      col = adjustcolor(
+              c("Vehicle" = "steelblue",
+                "Pedestrian" = "tomato",
+                "Cyclist" = "seagreen")[as.character(data_clean$AgentType)],
+              alpha.f = 0.2),
+      pch  = 16,
+      cex  = 0.3,
+      main = "Feature Pairs Plot (Blue=Vehicle, Red=Pedestrian, Green=Cyclist)")
+```
+
+```{r}
+# Correlation broken down by AgentType
+for (ag in levels(data_clean$AgentType)) {
+  subset_ag <- data_clean %>% filter(AgentType == ag)
+  cor_ag <- cor(subset_ag[, kinematic_vars], use = "complete.obs")
+  cat("\n=== Correlation:", ag, "(n =", nrow(subset_ag), ") ===\n")
+  print(round(cor_ag, 3))
+}
+```
+
+```{r}
+# Descriptive summary
+summary(data_clean[, c("Speed", "Acceleration", "YawRate")])
 
 hist(data_clean$Speed,
-     main = "Vehicle Speed Distribution",
+     main = "Speed Distribution — All Agent Types",
      xlab = "Speed (m/s)",
-     col = "skyblue")
+     col  = "skyblue",
+     breaks = 40)
 
-speed_skewness <- skewness(data_clean$Speed)
-cat("Speed Skewness:", speed_skewness)
-
-accel_threshold <- quantile(data_clean$Acceleration, 0.99)
-cat("99th Percentile Acceleration:", accel_threshold)
+cat("Speed skewness:", e1071::skewness(data_clean$Speed), "\n")
+cat("99th percentile acceleration:", quantile(data_clean$Acceleration, 0.99), "\n")
 ```
 
+---
 
+# 2. Isolation Forest — Anomaly Detection
 
-``` {r}
-# Isolation Forest
+*YawRate's independence from other features makes it a strong candidate for anomaly isolation.*
+
+```{r}
 iso_model <- isolation.forest(
   data_clean[, c("Speed", "Acceleration", "YawRate")],
-  ntrees = 100,
+  ntrees   = 100,
   nthreads = 1
 )
 
@@ -273,17 +176,19 @@ data_clean$Is_Anomaly <- as.factor(
   ifelse(data_clean$AnomalyScore > score_threshold, "Yes", "No")
 )
 
+cat("Anomaly threshold (99th percentile):", score_threshold, "\n")
 table(data_clean$Is_Anomaly)
 ```
 
-``` {r}
-# --- Who are the anomalous agents? ---
+```{r}
+# Who are the anomalous agents?
 anomalous_agents <- data_clean %>%
   filter(Is_Anomaly == "Yes") %>%
-  select(ScenarioID, AgentID, AgentType, Speed, Acceleration, YawRate, Length, Width, AnomalyScore, IsInteractive) %>%
+  select(ScenarioID, AgentID, AgentType, Speed, Acceleration,
+         YawRate, Length, Width, AnomalyScore, IsInteractive) %>%
   arrange(desc(AnomalyScore))
 
-cat("Total anomalous agents flagged:", nrow(anomalous_agents), "\n\n")
+cat("Total flagged:", nrow(anomalous_agents), "\n\n")
 
 cat("=== Breakdown by Agent Type ===\n")
 print(table(anomalous_agents$AgentType))
@@ -291,30 +196,23 @@ print(table(anomalous_agents$AgentType))
 cat("\n=== Top 20 Most Anomalous Agents ===\n")
 print(head(anomalous_agents, 20))
 
-cat("\n=== Summary Statistics of Anomalous Agents ===\n")
+cat("\n=== Summary Statistics ===\n")
 print(summary(anomalous_agents[, c("Speed", "Acceleration", "YawRate", "AnomalyScore")]))
 
-cat("\n=== What % of anomalous agents are flagged as Interactive by Waymo? ===\n")
+cat("\n=== % flagged as Interactive by Waymo ===\n")
 print(prop.table(table(anomalous_agents$IsInteractive)))
 ```
 
-``` {r}
-# Statistical Test
-contingency_table <- table(data_clean$AgentType,
-                           data_clean$Is_Anomaly)
-
-fisher_results <- fisher.test(contingency_table,
-                              simulate.p.value = TRUE)
-
-fisher_results
+```{r}
+# Fisher's Exact Test: is anomaly rate associated with AgentType?
+contingency_table <- table(data_clean$AgentType, data_clean$Is_Anomaly)
+fisher.test(contingency_table, simulate.p.value = TRUE)
 ```
-
----
 
 ## Isolation Forest Explainability
 
-``` {r}
-# --- Feature distributions: Anomalous vs. Normal ---
+```{r}
+# Feature distributions: normal vs anomalous
 data_clean %>%
   select(Speed, Acceleration, YawRate, Is_Anomaly) %>%
   pivot_longer(-Is_Anomaly, names_to = "Feature", values_to = "Value") %>%
@@ -323,30 +221,24 @@ data_clean %>%
   geom_boxplot(width = 0.12, outlier.size = 0.8, alpha = 0.8) +
   facet_wrap(~Feature, scales = "free_y") +
   scale_fill_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
-  labs(
-    title = "Kinematic Feature Distributions: Normal vs. Anomalous Agents",
-    subtitle = "Anomalies are concentrated at the tails of each distribution",
-    x = "Is Anomaly", y = "Value", fill = "Anomaly"
-  ) +
+  labs(title = "Feature Distributions: Normal vs. Anomalous Agents",
+       x = "Is Anomaly", y = "Value", fill = "Anomaly") +
   theme_minimal()
 ```
 
-``` {r}
-# --- Anomaly score vs. each feature (scatter with LOESS) ---
+```{r}
+# Anomaly score vs each feature with LOESS
 features_to_plot <- c("Speed", "Acceleration", "YawRate")
 
 plots <- lapply(features_to_plot, function(feat) {
-  ggplot(data_clean, aes_string(x = feat, y = "AnomalyScore",
-                                color = "Is_Anomaly")) +
+  ggplot(data_clean, aes_string(x = feat, y = "AnomalyScore", color = "Is_Anomaly")) +
     geom_point(alpha = 0.3, size = 0.8) +
     geom_smooth(aes(group = 1), method = "loess", se = FALSE,
                 color = "black", linewidth = 0.8) +
-    geom_hline(yintercept = quantile(data_clean$AnomalyScore, 0.99),
-               linetype = "dashed", color = "red") +
+    geom_hline(yintercept = score_threshold, linetype = "dashed", color = "red") +
     scale_color_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
     labs(title = paste("Anomaly Score vs.", feat),
-         subtitle = "Red dashed line = 99th percentile threshold",
-         x = feat, y = "Anomaly Score") +
+         subtitle = "Red dashed = 99th percentile threshold") +
     theme_minimal() +
     theme(legend.position = "none")
 })
@@ -355,18 +247,15 @@ grid.arrange(grobs = plots, ncol = 2,
              top = "Isolation Forest: Score Sensitivity per Feature")
 ```
 
-``` {r}
-# --- Permutation feature importance for Isolation Forest ---
-# Measures how much the anomaly score distribution shifts when a feature is shuffled
+```{r}
+# Permutation feature importance
 set.seed(42)
-kinematic_features <- c("Speed", "Acceleration", "YawRate")
-baseline_scores    <- data_clean$AnomalyScore
+baseline_scores <- data_clean$AnomalyScore
 
-perm_importance <- sapply(kinematic_features, function(feat) {
-  shuffled       <- data_clean[, kinematic_features]
+perm_importance <- sapply(features_to_plot, function(feat) {
+  shuffled <- data_clean[, features_to_plot]
   shuffled[[feat]] <- sample(shuffled[[feat]])
-  perm_scores    <- predict(iso_model, shuffled)
-  # Importance = mean absolute deviation from baseline when feature is destroyed
+  perm_scores <- predict(iso_model, shuffled)
   mean(abs(perm_scores - baseline_scores))
 })
 
@@ -378,276 +267,95 @@ perm_df <- data.frame(
 ggplot(perm_df, aes(x = reorder(Feature, Importance), y = Importance, fill = Feature)) +
   geom_col(show.legend = FALSE) +
   coord_flip() +
-  labs(
-    title    = "Isolation Forest: Permutation Feature Importance",
-    subtitle = "Higher value = shuffling this feature disrupts anomaly scores more",
-    x = "", y = "Mean |Score Deviation|"
-  ) +
+  labs(title    = "Isolation Forest: Permutation Feature Importance",
+       subtitle = "Higher = shuffling this feature disrupts anomaly scores more",
+       x = "", y = "Mean |Score Deviation|") +
   theme_minimal()
 
 print(perm_df)
 ```
 
-``` {r}
-# --- Anomaly rate and mean score by AgentType ---
+```{r}
+# Anomaly rate and mean score by AgentType
 agent_summary <- data_clean %>%
   group_by(AgentType) %>%
-  summarise(
-    Count        = n(),
-    Anomaly_Rate = mean(Is_Anomaly == "Yes"),
-    Mean_Score   = mean(AnomalyScore),
-    .groups      = "drop"
-  )
+  summarise(Count        = n(),
+            Anomaly_Rate = mean(Is_Anomaly == "Yes"),
+            Mean_Score   = mean(AnomalyScore),
+            .groups      = "drop")
 
 p1 <- ggplot(agent_summary, aes(x = AgentType, y = Anomaly_Rate, fill = AgentType)) +
   geom_col(show.legend = FALSE) +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Anomaly Rate by Agent Type", x = "", y = "% Flagged as Anomalous") +
+  labs(title = "Anomaly Rate by Agent Type", x = "", y = "% Flagged") +
   theme_minimal()
 
 p2 <- ggplot(agent_summary, aes(x = AgentType, y = Mean_Score, fill = AgentType)) +
   geom_col(show.legend = FALSE) +
-  labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Isolation Forest Score") +
+  labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Score") +
   theme_minimal()
 
 grid.arrange(p1, p2, ncol = 2)
 print(agent_summary)
 ```
 
-``` {r}
-# Train/Test Split
-trainIndex <- createDataPartition(data_clean$Is_Anomaly,
-                                  p = .8,
-                                  list = FALSE)
-
-train_data <- data_clean[trainIndex, ]
-test_data  <- data_clean[-trainIndex, ]
-```
-
-``` {r}
-# Handle Class Imbalance
-train_balanced <- downSample(
-  x = train_data[, c("Length", "Width", "YawRate")],
-  y = train_data$Is_Anomaly
-)
-
-names(train_balanced)[names(train_balanced) == "Class"] <- "Is_Anomaly"
-
-table(train_balanced$Is_Anomaly)
-```
-
-``` {r}
-# Random Forest Model
-fit_control <- trainControl(
-  method = "cv",
-  number = 5,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary
-)
-
-model_rf <- train(
-  Is_Anomaly ~ Length + Width + YawRate,
-  data = train_balanced,
-  method = "rf",
-  metric = "ROC",
-  trControl = fit_control
-)
-
-model_rf
-```
-
-``` {r}
-# Evaluation
-predictions <- predict(model_rf, test_data)
-
-conf_matrix <- confusionMatrix(predictions,
-                               test_data$Is_Anomaly)
-
-conf_matrix
-```
-
 ---
 
-## Random Forest Explainability
+# 3. Linear Regression — Motion Prediction
 
-``` {r}
-# --- Variable Importance ---
-rf_importance <- varImp(model_rf, scale = TRUE)
-
-plot(rf_importance,
-     main = "Random Forest: Variable Importance (Mean Decrease in Gini)")
-
-# Print numeric values
-print(rf_importance)
-```
-
-``` {r}
-# --- Partial Dependence Plots (marginal effect of each feature on P(Anomaly)) ---
-pd_yawrate <- partial(model_rf, pred.var = "YawRate",
-                      which.class = "Yes", prob = TRUE, train = train_balanced)
-pd_length  <- partial(model_rf, pred.var = "Length",
-                      which.class = "Yes", prob = TRUE, train = train_balanced)
-pd_width   <- partial(model_rf, pred.var = "Width",
-                      which.class = "Yes", prob = TRUE, train = train_balanced)
-
-p_yr <- autoplot(pd_yawrate) +
-  labs(title = "PDP: Yaw Rate", subtitle = "Effect on P(Anomaly = Yes)",
-       x = "YawRate (rad/s)", y = "Predicted P(Anomaly)") +
-  theme_minimal()
-
-p_ln <- autoplot(pd_length) +
-  labs(title = "PDP: Agent Length", subtitle = "Effect on P(Anomaly = Yes)",
-       x = "Length (m)", y = "Predicted P(Anomaly)") +
-  theme_minimal()
-
-p_wd <- autoplot(pd_width) +
-  labs(title = "PDP: Agent Width", subtitle = "Effect on P(Anomaly = Yes)",
-       x = "Width (m)", y = "Predicted P(Anomaly)") +
-  theme_minimal()
-
-grid.arrange(p_yr, p_ln, p_wd, ncol = 2,
-             top = "Partial Dependence Plots: Marginal Feature Effects on Anomaly Probability")
-```
-
-``` {r}
-# --- Two-way PDP: interaction between YawRate and Width ---
-pd_2way <- partial(model_rf, pred.var = c("YawRate", "Width"),
-                   which.class = "Yes", prob = TRUE, train = train_balanced)
-
-plotPartial(pd_2way,
-            main  = "2-Way PDP: YawRate × Width Interaction on P(Anomaly)",
-            xlab  = "YawRate (rad/s)", ylab = "Width (m)",
-            col.regions = heat.colors(100))
-```
-
-#Linear Regression on Future Distance 5s: 
+*Does YawRate, identified as the key anomaly signal, also predict future displacement?*
 
 ```{r}
-model_data <- data[, c(
-  "AgentType",
-  "Speed",
-  "Acceleration",
-  "YawRate",
-  "Vel_X",
-  "Vel_Y",
-  "FutureDist_5s"
-)]
+# Base cleaned dataset
+base_data <- data %>%
+  filter(!is.na(Speed), !is.na(Acceleration), !is.na(YawRate),
+         !is.na(Vel_X), !is.na(Vel_Y), !is.na(FutureDist_5s))
 
-# Remove rows missing FutureDist_5s
-model_data <- subset(model_data, !is.na(FutureDist_5s))
-
-```
-
-
-
-
-
-```{r}
-summary(model_data$Speed)
-summary(model_data$FutureDist_5s)
-
-aggregate(Speed ~ AgentType, data = model_data, mean)
-
-```
-
-```{r}
-
-moving_data <- subset(data, Speed > 0)
-
-aggregate(Speed ~ AgentType, data = moving_data, mean)
-```
-
-When including stationary agents, vehicles exhibited a lower mean speed than cyclists due to a high proportion of zero-velocity observations (e.g., vehicles stopped at intersections). After filtering for moving agents (Speed > 0), vehicles exhibited the highest average speed (6.74 m/s), followed by cyclists (3.92 m/s) and pedestrians (1.07 m/s), consistent with real-world expectations
-
-
-```{r}
-
-
-FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
-
-```
-
-```{r}
-# Base cleaned dataset (no NA in predictors or target)
-base_data <- subset(data, 
-                    !is.na(Speed) &
-                    !is.na(Acceleration) &
-                    !is.na(YawRate) &
-                    !is.na(Vel_X) &
-                    !is.na(Vel_Y) &
-                    !is.na(FutureDist_5s))
-
-# Dataset A: WITH stationary vehicles
 data_with_stationary <- base_data
+data_no_stationary   <- subset(base_data, Speed > 0)
 
-# Dataset B: WITHOUT stationary vehicles
-data_no_stationary <- subset(base_data, Speed > 0)
+cat("With stationary:", nrow(data_with_stationary), "\n")
+cat("Without stationary:", nrow(data_no_stationary), "\n")
 
-dim(data_with_stationary)
-dim(data_no_stationary)
-
+# Speed by AgentType (moving only)
+cat("\nMean speed by agent type (moving agents):\n")
+aggregate(Speed ~ AgentType, data = data_no_stationary, mean)
 ```
 
 ```{r}
-
-library(caret)
-
 run_model <- function(dataset) {
-  
   set.seed(123)
-  
-  n <- nrow(dataset)
-  train_index <- sample(1:n, size = 0.8*n)
-  
-  train <- dataset[train_index, ]
-  test  <- dataset[-train_index, ]
-  
-  control <- trainControl(method = "cv", number = 5)
-  
+  n           <- nrow(dataset)
+  train_index <- sample(1:n, size = 0.8 * n)
+  train       <- dataset[train_index, ]
+  test        <- dataset[-train_index, ]
+  control     <- trainControl(method = "cv", number = 5)
+
   model <- train(
     FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
-    data = train,
-    method = "lm",
+    data      = train,
+    method    = "lm",
     trControl = control
   )
-  
-  # Test predictions
+
   pred <- predict(model, newdata = test)
-  
-  # RMSE
   rmse <- sqrt(mean((pred - test$FutureDist_5s)^2))
-  
-  # R-squared
-  rss <- sum((pred - test$FutureDist_5s)^2)
-  tss <- sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
-  r2 <- 1 - rss/tss
-  
-  return(list(
-    RMSE = rmse,
-    R2 = r2,
-    CV_Results = model$results
-  ))
+  r2   <- 1 - sum((pred - test$FutureDist_5s)^2) /
+              sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
+
+  list(RMSE = rmse, R2 = r2, CV_Results = model$results)
 }
 
-
-```
-
-
-```{r}
-
-results_with <- run_model(data_with_stationary)
+results_with    <- run_model(data_with_stationary)
 results_without <- run_model(data_no_stationary)
 
-results_with
-results_without
+cat("=== With Stationary ===\n");    print(results_with)
+cat("\n=== Without Stationary ===\n"); print(results_without)
 ```
 
----
+## Regression Explainability
 
-## Linear Regression Explainability
-
-``` {r}
-# Fit plain lm() models for explainability (caret wraps lm, so we refit for diagnostics)
+```{r}
 lm_with    <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
                  data = data_with_stationary)
 lm_without <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
@@ -657,19 +365,14 @@ summary(lm_with)
 summary(lm_without)
 ```
 
-``` {r}
-# --- Coefficient plot with 95% CI (both datasets overlaid) ---
+```{r}
+# Coefficient plot with 95% CI — both datasets overlaid
 extract_coefs <- function(model, label) {
   ci  <- confint(model)
   est <- coef(model)
-  data.frame(
-    Term     = rownames(ci),
-    Estimate = est,
-    Lower    = ci[, 1],
-    Upper    = ci[, 2],
-    Dataset  = label,
-    stringsAsFactors = FALSE
-  )
+  data.frame(Term = rownames(ci), Estimate = est,
+             Lower = ci[,1], Upper = ci[,2], Dataset = label,
+             stringsAsFactors = FALSE)
 }
 
 coef_df <- bind_rows(
@@ -684,75 +387,55 @@ ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
                 position = position_dodge(width = 0.5), width = 0.3) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   coord_flip() +
-  labs(
-    title    = "Regression Coefficients with 95% Confidence Intervals",
-    subtitle = "Comparing models with vs. without stationary agents",
-    x = "", y = "Coefficient (metres per unit)"
-  ) +
+  labs(title    = "Regression Coefficients with 95% CI",
+       subtitle = "With vs. without stationary agents",
+       x = "", y = "Coefficient (metres per unit)") +
   theme_minimal()
 ```
 
-``` {r}
-# --- Standardized (beta) coefficients for relative importance ---
-# Scale all continuous predictors to mean=0, SD=1 before fitting
-std_formula <- FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
-
+```{r}
+# Standardized beta coefficients
 scale_df <- function(df) {
   df %>% mutate(across(c(Speed, Acceleration, YawRate, Vel_X, Vel_Y, FutureDist_5s),
                        ~ as.numeric(scale(.))))
 }
 
-lm_with_std    <- lm(std_formula, data = scale_df(data_with_stationary))
-lm_without_std <- lm(std_formula, data = scale_df(data_no_stationary))
+lm_with_std    <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                     data = scale_df(data_with_stationary))
+lm_without_std <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                     data = scale_df(data_no_stationary))
 
 std_coef_df <- bind_rows(
   data.frame(Term = names(coef(lm_with_std)[-1]),
-             Beta = coef(lm_with_std)[-1],
-             Dataset = "With Stationary"),
+             Beta = coef(lm_with_std)[-1], Dataset = "With Stationary"),
   data.frame(Term = names(coef(lm_without_std)[-1]),
-             Beta = coef(lm_without_std)[-1],
-             Dataset = "Without Stationary")
+             Beta = coef(lm_without_std)[-1], Dataset = "Without Stationary")
 )
 
 ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
   geom_col(position = "dodge") +
   coord_flip() +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(
-    title    = "Standardized Regression Coefficients (β)",
-    subtitle = "Magnitude reflects relative importance; sign shows direction",
-    x = "", y = "Standardized Coefficient (β)"
-  ) +
+  labs(title    = "Standardized Coefficients (β)",
+       subtitle = "Magnitude = relative importance; sign = direction of effect",
+       x = "", y = "β") +
   theme_minimal()
 
 print(std_coef_df)
 ```
 
-``` {r}
-# --- Variance Inflation Factors (multicollinearity check) ---
-cat("=== VIF: With Stationary ===\n")
-print(vif(lm_with))
-
-cat("\n=== VIF: Without Stationary ===\n")
-print(vif(lm_without))
+```{r}
+# VIF — multicollinearity check
+cat("=== VIF: With Stationary ===\n");    print(vif(lm_with))
+cat("\n=== VIF: Without Stationary ===\n"); print(vif(lm_without))
 ```
 
-``` {r}
-# --- Added-Variable (Partial Regression) Plots ---
-# Shows the unique contribution of each predictor after accounting for all others.
-# Points off the horizontal = leverage observations; slope = partial coefficient.
-par(mfrow = c(1, 1))
-avPlots(lm_without,
-        main = "Added-Variable Plots (Moving Agents Only)",
-        ask  = FALSE)
+```{r}
+# Added-variable plots — unique contribution of each predictor
+avPlots(lm_without, main = "Added-Variable Plots (Moving Agents)", ask = FALSE)
 ```
 
-``` {r}
-# --- Component + Residual Plots (non-linearity check) ---
-# A non-linear smooth (pink) diverging from the straight line suggests a
-# predictor needs a transformation (e.g., log-speed or speed²).
-crPlots(lm_without,
-        main = "Component + Residual Plots (Moving Agents Only)",
-        ask  = FALSE)
+```{r}
+# Component + residual plots — linearity check
+crPlots(lm_without, main = "Component + Residual Plots (Moving Agents)", ask = FALSE)
 ```
-

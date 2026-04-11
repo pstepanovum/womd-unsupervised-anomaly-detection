@@ -1,0 +1,58 @@
+Top 20 Most Anomalous Vehicles — Isolation Forest (Vehicles Only, 99th Percentile)
+Generated from: Waymo Open Motion Dataset v1.3.1 (300 scenarios, validation split)
+Model: Isolation Forest, 100 trees, features: Speed, Acceleration, YawRate
+Filter: AgentType == "Vehicle", Speed > 0, Valid_Current == True
+==========================================================================
+
+ScenarioID        AgentID  Speed        Acceleration   YawRate       Length     Width      AnomalyScore  IsInteractive
+909244b878c6c203  1409     49.75223369   355.776510     0.04865170   9.850329   3.083255   0.8741894     False
+5baef16beff3351   1554     24.92154686   230.998700    30.63660622   4.662052   2.052348   0.8524257     False
+c014d3c05600714f  560      32.43434473   239.865961    -0.33661485   4.663567   2.049667   0.8072905     False
+3eea09dc81191856  998       3.47468379    19.709500    31.33709971   4.920940   2.133497   0.7941221     False
+cffef7d3778fc611  1265     17.03667528     0.000000   -16.95376135   4.504891   2.021624   0.7650331     False
+308716b64a079919  1571      0.72764665     3.881429   -31.31476481   4.896689   2.148700   0.7522863     False
+2f8f82f1072ad710  55        0.23442586    -8.354339   -30.90170685   4.645941   2.073300   0.7519684     False
+262112a66742fe8d  1478      5.10418412   -31.322689    14.83763937   4.760413   2.118860   0.7478760     False
+d3fd8cb194ea76f6  1093      2.33055086     0.000000   -30.91647450   4.546289   2.014066   0.7384572     False
+2c4cec5c3ea292e2  2861      2.45665647    -4.519438   -31.20790545   5.233652   2.318481   0.7341605     False
+d4a4aac0a880c4a1  2575      0.39305882    -2.186779   -31.38904389   4.712109   2.042763   0.7319975     False
+27597bc952d2c9c7  891      14.44406233     0.000000    15.64204171   4.478561   2.014064   0.7183988     False
+308716b64a079919  1602      2.73414095   -81.780950     0.20420790   4.561765   2.045049   0.7079211     False
+909244b878c6c203  1413     34.85415077    -2.175157    -0.05626202   4.662207   2.054809   0.6570960     False
+3e88a588e36844fc 543      14.99228299    81.148385     0.11758685  11.537793   3.112813   0.6420780     False
+f81f4ca1ed8c0296  1847     23.34400309    51.682057     0.09177804   4.496803   2.011886   0.6146499     False
+fb7867184ab1a886  142      23.26489998    33.187612     0.30738831   4.570212   2.055603   0.6078226     False
+909244b878c6c203  1411     32.28807790    -3.339204    -0.04016876   4.747547   1.986919   0.6065409     False
+5d3dd267ff0560f8  46        0.09175596   -44.685279    -0.03896885   7.402043   2.865394   0.5984919     False
+8bdbbe8276d03a1f  358      22.35728994    42.938319    -0.19557953   6.535276   2.564019   0.5977391     False
+
+==========================================================================
+KEY OBSERVATIONS
+==========================================================================
+
+Scenario 909244b878c6c203 appears 3 times (AgentIDs 1409, 1413, 1411):
+  - Agent 1409: 49.75 m/s (~180 km/h), acceleration 355 m/s² — extreme outlier
+  - Agent 1413: 34.85 m/s, normal acceleration — likely same high-speed scene
+  - Agent 1411: 32.29 m/s, normal acceleration — same scene, multiple fast vehicles
+  - This scenario is almost certainly a data artifact or highway merge at extreme speed
+
+YawRate clipping cluster (rows 4, 6, 7, 8, 9, 10, 11):
+  - YawRate near ±31 rad/s at near-zero speed — same sensor artifact as full dataset
+  - Filtering to vehicles only did NOT eliminate this artifact
+
+Genuine high-speed anomalies (rows 1, 3, 14, 16, 17, 18, 20):
+  - Speeds 22-50 m/s (80-180 km/h) with high acceleration
+  - These are more plausible real-world dangerous driving events
+  - Still IsInteractive = False — Waymo did not flag these as AV-relevant interactions
+
+Large vehicle outliers (rows 15, 19):
+  - Row 15: Length 11.54m (truck/bus), high acceleration — large vehicle behaving unusually
+  - Row 19: Length 7.40m, near-stationary with extreme deceleration (-44.7 m/s²)
+
+IsInteractive = False for ALL top 20 vehicles
+
+==========================================================================
+To visualize in waymo_vehicle_scenarios.ipynb:
+  - Scenario 909244b878c6c203: agents {1409, 1413, 1411}
+  - Scenario 308716b64a079919: agents {1571, 1602}
+==========================================================================
