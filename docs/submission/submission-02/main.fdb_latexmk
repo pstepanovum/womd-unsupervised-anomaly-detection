@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex main"] 1772832444.37042 "main.aux" "main.bbl" "main" 1772832524.55635 0
+["bibtex main"] 1775940879.16811 "main.aux" "main.bbl" "main" 1775940880.09929 0
   "./references.bib" 1772832320.20913 2611 e03537571b39c113b2ef93a9fb189be8 ""
   "/usr/local/texlive/2025/texmf-dist/bibtex/bst/ieeetran/IEEEtran.bst" 1440712899 57748 7c8250ecf02814ce6ddc0cdbb63df1dd ""
-  "main.aux" 1772832524.3118 5090 39ccae645705db560b022e4eb335f2a2 "pdflatex"
+  "main.aux" 1775940879.84967 5518 d13b1976e0b76feaccb99bf512eac7db "pdflatex"
   (generated)
   "main.bbl"
   "main.blg"
   (rewritten before read)
-["pdflatex"] 1772832523.75629 "/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/docs/submission/submission-01/main.tex" "main.pdf" "main" 1772832524.55647 0
-  "/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/docs/submission/submission-01/main.tex" 1772832523.57674 21155 77c5c8ca573ea49c9dc1a2ab2b7f9e95 ""
+["pdflatex"] 1775940879.29642 "/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/docs/submission/submission-02/main.tex" "main.pdf" "main" 1775940880.09943 0
+  "/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/docs/submission/submission-02/main.tex" 1775940877.92232 24287 a1cd311369f57ab6726a958798069cd3 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/courier/pcrb7t.tfm" 1136768653 960 4ab65358b8406f30ef5496c8c096d22b ""
@@ -52,9 +52,11 @@
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb" 1248133631 32734 69e00a6b65cedb993666e42eedb3d48f ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb" 1248133631 32762 224316ccc9ad3ca0423a14971cfa7fc1 ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb" 1248133631 32726 0a1aea6fcd6468ee2cf64d891f5c43c8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb" 1248133631 33993 9b89b85fd2d9df0482bd47194d1d3bf3 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb" 1248133631 32569 5e5ddc8df908dea60932f3c484a54c0d ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb" 1248133631 32716 08e384dc442464e7285e891af9f45947 ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb" 1248133631 32442 c975af247b6702f7ca0c299af3616b80 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/urw/courier/ucrb8a.pfb" 1136849748 50493 4ed1f7e9eba8f1f3e1ec25195460190d ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb" 1136849748 45758 19968a0990191524e34e1994d4a31cb6 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/urw/courier/ucrro8a.pfb" 1136849748 44404 ea3d9c0311883914133975dd62a9185c ""
@@ -142,10 +144,10 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1744237081 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1741450574 3345740 46b66fdb0378f7bf5921b5eabf1762b8 ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "main.aux" 1772832524.3118 5090 39ccae645705db560b022e4eb335f2a2 "pdflatex"
-  "main.bbl" 1772832444.46438 2543 ec927716e688106265d3776552ab7347 "bibtex main"
-  "main.out" 1772832524.3126 2608 21430f1c6494d1790c824068955814a8 "pdflatex"
-  "main.tex" 1772832523.57674 21155 77c5c8ca573ea49c9dc1a2ab2b7f9e95 ""
+  "main.aux" 1775940879.84967 5518 d13b1976e0b76feaccb99bf512eac7db "pdflatex"
+  "main.bbl" 1775940879.29413 2543 ec927716e688106265d3776552ab7347 "bibtex main"
+  "main.out" 1775940879.85032 2817 5df17e8adb08e80ef7d65aded5c2193e "pdflatex"
+  "main.tex" 1775940877.92232 24287 a1cd311369f57ab6726a958798069cd3 ""
   (generated)
   "main.aux"
   "main.log"
