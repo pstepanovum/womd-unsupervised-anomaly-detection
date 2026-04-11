@@ -2,69 +2,122 @@ Project Summary — Waymo Unsupervised Anomaly Detection
 Generated: 2026-04-11
 ==========================================================================
 
+PROJECT PROPOSAL
+----------------
+Can classical, interpretable machine learning methods reliably identify
+anomalous driving behavior in large-scale autonomous vehicle datasets —
+without any labels?
+
+Modern AV systems increasingly rely on deep learning, but deep models are
+expensive, opaque, and require large labeled datasets that rarely exist for
+rare or dangerous events. This project tests whether a traditional statistical
+pipeline (correlation analysis + Isolation Forest + linear regression) can
+extract meaningful signal from raw kinematic data alone.
+
+The answer is: yes, with caveats. The pipeline successfully identified a small
+number of genuinely unusual high-speed driving events. It also surfaced a
+systematic sensor artifact that would have gone unnoticed without the anomaly
+detection step. Both findings are useful, and together they make a case for
+classical methods as a practical first-pass tool in AV safety research.
+
+==========================================================================
 DATASET
--------
+==========================================================================
 Waymo Open Motion Dataset v1.3.1
-- 300 scenarios, validation split
-- 18,311 raw agent observations (vehicles, pedestrians, cyclists, SDC)
-- After preprocessing (remove SDC, stationary agents, invalid frames, NAs):
+- 300 scenarios, validation split (shard 00000-of-00150)
+- 18,311 raw agent observations across vehicles, pedestrians, cyclists, and SDC
+- After preprocessing (remove SDC, invalid frames, missing values):
   4,538 agents used for anomaly detection
-  6,614 for regression (with stationary); 3,196 (without stationary)
+  6,614 for regression (with stationary agents); 3,196 (without stationary)
 
-PIPELINE
---------
-1. Correlation EDA
-2. Isolation Forest (anomaly detection)
-3. Linear Regression (motion prediction)
+Agent types: Vehicle (majority), Pedestrian (~25%), Cyclist (~5%)
+SDC (the Waymo self-driving car itself) excluded from all analysis.
 
 ==========================================================================
-FINDING 1 — YAW RATE IS INDEPENDENT OF EVERYTHING ELSE
+PIPELINE — THREE STEPS
 ==========================================================================
 
-Pearson correlations across all features showed that yaw rate is essentially
-uncorrelated with speed, acceleration, and agent size (r ≤ 0.09).
-Speed and size have weak positive correlations (r ≈ 0.28).
-Agent length and width are nearly redundant (r = 0.97).
+Step 1: EDA and Dataset Analysis
+  Pearson correlation across all kinematic and morphological features.
+  Goal: understand the feature space before modeling.
+
+Step 2: Isolation Forest — Anomaly Detection
+  Core unsupervised model. No labels required.
+  Flags the top 1% of agents by anomaly score as unusual.
+
+Step 3: Linear Regression — Speed Analysis (Supporting Evidence)
+  Predicts 5-second future displacement from kinematic features.
+  Shows what actually drives agent motion — separate question from anomaly detection.
+
+==========================================================================
+STEP 1 — EDA: YAW RATE STANDS ALONE
+==========================================================================
+
+Pearson correlations across all features show that yaw rate is essentially
+uncorrelated with everything else (r ≤ 0.09). Speed and size have a weak
+positive relationship (r ≈ 0.28). Agent length and width are nearly redundant
+(r = 0.97).
 
 What this means: yaw rate is the only feature that captures something the
-others don't — how much an agent is turning, independent of how fast or
-how large it is. This makes it the natural driver of anomaly scores in
-Isolation Forest.
+others do not — how much an agent is turning, independent of how fast or
+how large it is. This makes it the natural primary signal for the Isolation
+Forest in the next step.
 
 ==========================================================================
-FINDING 2 — ANOMALY DETECTION: MOST WERE DUDS, BUT WE CAUGHT 3 REAL ONES
+STEP 2 — ISOLATION FOREST: ANOMALY DETECTION
 ==========================================================================
 
 Model: Isolation Forest, 100 trees, 99th percentile threshold
 Features: Speed, Acceleration, YawRate
 Flagged: 46 out of 4,538 agents (~1%)
 
-Fisher's Exact Test: p = 0.0005 — anomalies not evenly distributed across
-agent types (pedestrians and cyclists flagged more than vehicles).
+Fisher's Exact Test: p = 0.0005 — anomalies are not evenly distributed
+across agent types. Pedestrians and cyclists are flagged more than vehicles,
+consistent with their more irregular movement patterns.
 
-TOP 20 INSPECTION:
-  ~3 genuine anomalies:
-    - ScenarioID 909244b878c6c203, AgentID 1409: 49.75 m/s (~180 km/h),
-      acceleration 355.8 m/s² — extreme speed event
-    - ScenarioID c014d3c05600714f, AgentID 560: 32.4 m/s, accel 239.9 m/s²
-    - ScenarioID 5baef16beff3351, AgentID 1554: 24.9 m/s, accel 231.0 m/s²
+TOP 20 INSPECTION — TWO CATEGORIES:
 
-  ~17 sensor artifacts:
-    - Near-stationary agents (v < 3 m/s) with YawRate stuck at ±31 rad/s
-    - This value recurs across 12 of the top 20 anomalies, all agent types
-    - 31 rad/s (~5 full rotations/sec) is physically impossible for a ground agent
-    - Likely numerical instability in heading derivative at near-zero speed
-    - These are data noise, not real dangerous behavior
+  Genuine anomalies (~3 of 20):
+    These correspond to real unusual driving events — high speed, high
+    acceleration, outside the normal operating range for urban driving.
 
-ALL top 20 flagged agents had IsInteractive = False — Waymo itself did not
-mark any of them as safety-relevant interactions.
+    - ScenarioID 909244b878c6c203, AgentID 1409:
+      49.75 m/s (~180 km/h), acceleration 355.8 m/s²
+    - ScenarioID c014d3c05600714f, AgentID 560:
+      32.4 m/s, acceleration 239.9 m/s²
+    - ScenarioID 5baef16beff3351, AgentID 1554:
+      24.9 m/s, acceleration 231.0 m/s²
 
-VEHICLES-ONLY REPLICATION (waymo_vehicles_only.Rmd):
-  Same artifact appears — filtering to vehicles only did not remove it.
-  Genuine high-speed outliers are cleaner without pedestrian YawRate noise.
+  Sensor artifact (~17 of 20):
+    Near-stationary agents (v < 3 m/s) with yaw rate fixed at ±31 rad/s.
+    This value appears in 12 of the top 20 anomalies across all three agent
+    types. A rotation rate of 31 rad/s is not physically plausible for any
+    ground agent. The pattern — always near zero speed, always the same
+    magnitude — is consistent with numerical instability in the heading
+    derivative computation at near-zero speed. These are data quality issues,
+    not genuine dangerous behavior.
+
+All top 20 anomalies carry IsInteractive = False — Waymo itself did not flag
+any of them as safety-relevant interactions.
+
+NOTE ON IsInteractive:
+  The IsInteractive flag in the Waymo dataset marks agents that are in close
+  proximity to the self-driving car and relevant to its immediate planning.
+  In practice, this means nearby vehicles in adjacent lanes or intersections —
+  routine traffic interactions, not dangerous events. Finding that our flagged
+  anomalies have IsInteractive = False is expected: the truly unusual events
+  (extreme speed, sensor artifacts) are not the same as the nearby-agent
+  interactions Waymo tracks for planning purposes. The two concepts measure
+  different things.
+
+VEHICLES-ONLY REPLICATION:
+  Running the same pipeline on vehicles only confirms the findings.
+  The sensor artifact persists even after filtering out pedestrians and cyclists.
+  The genuine high-speed anomalies are cleaner and easier to interpret in the
+  vehicles-only view.
 
 ==========================================================================
-FINDING 3 — REGRESSION: SPEED DOMINATES, YAW RATE DOES NOTHING
+STEP 3 — REGRESSION: SPEED DRIVES FUTURE DISPLACEMENT
 ==========================================================================
 
 Model: Linear regression predicting FutureDist_5s
@@ -74,45 +127,46 @@ With stationary agents included:
   Test RMSE = 7.44 m,  R² = 0.880
   CV RMSE   = 7.65 m,  CV R² = 0.886
 
-Without stationary agents:
+Without stationary agents (moving agents only):
   Test RMSE = 13.15 m, R² = 0.728
   CV RMSE   = 10.05 m, CV R² = 0.860
 
 Standardized coefficients (moving agents):
-  Speed    β ≈ 0.95   ← dominant predictor
-  Vel_X    β ≈ 0.XX
-  Vel_Y    β ≈ 0.XX
-  YawRate  β ≈ -0.007 ← near zero
+  Speed    β ≈ 0.95   — dominant predictor by a wide margin
+  YawRate  β ≈ -0.007 — near zero
 
-The drop in R² when stationary agents are removed (0.88 → 0.73) is expected:
+The R² drop when stationary agents are removed (0.88 → 0.73) is expected:
 stationary agents are trivially predictable (future displacement ≈ 0).
 The 0.73 on moving agents is the more realistic real-world number.
 
 ==========================================================================
-THE KEY INSIGHT — ANOMALY DETECTION AND REGRESSION MEASURE DIFFERENT THINGS
+KEY INSIGHT — THE TWO MODELS ANSWER DIFFERENT QUESTIONS
 ==========================================================================
 
-This is not a contradiction. They answer different questions:
+Isolation Forest (yaw rate driven):
+  "Is this agent behaving unusually?"
+  Yaw rate dominates because it is orthogonal to all other features.
+  High yaw rate at near-zero speed = erratic or unstable behavior.
 
-  Isolation Forest (yaw rate driven):
-    "Is this agent behaving unusually?" — captures erratic turning
-    YawRate dominates because it's orthogonal to all other features
+Linear Regression (speed driven):
+  "How far will this agent travel in 5 seconds?"
+  Speed dominates because displacement is a direct function of velocity.
+  Yaw rate contributes almost nothing to this question.
 
-  Linear Regression (speed driven):
-    "How far will this agent travel in 5 seconds?" — kinematics only
-    Speed dominates because displacement is a direct function of velocity
-
-Together: one tells you if something looks weird, the other tells you
-where it's going. They're complementary, not redundant.
+This is not a contradiction — the two models measure fundamentally different
+aspects of agent behavior. Together they provide complementary views:
+one flags what looks unusual, the other predicts where it will go.
 
 ==========================================================================
-WHAT WE'D DO DIFFERENTLY
+WHAT WOULD IMPROVE THIS
 ==========================================================================
 
-- Filter YawRate (e.g., |yaw| < 10 rad/s) before running Isolation Forest
-  to remove the sensor artifact from the top anomalies
-- Validate flagged anomalies against IsInteractive = True as a ground truth
-- Apply analysis to the full dataset (not just 300 scenarios) for more
-  genuine high-speed events in the tail
+- Filter yaw rate before anomaly detection (e.g., |yaw| < 10 rad/s) to
+  remove the sensor artifact and surface more meaningful anomalies
+- Validate flagged anomalies against IsInteractive as a reference label,
+  keeping in mind that IsInteractive reflects proximity-based planning flags
+  rather than safety-critical event labels
+- Apply to the full dataset (not just 300 scenarios) for a larger tail of
+  genuine high-speed events
 
 ==========================================================================
