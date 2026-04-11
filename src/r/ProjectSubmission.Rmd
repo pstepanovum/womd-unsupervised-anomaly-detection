@@ -202,11 +202,19 @@ In pedestrian-heavy urban environments, anomaly detection flags irregular behavi
 # Code Implementation
 
 ```{r}
+required_packages <- c("tidyverse", "caret", "isotree", "e1071",
+                        "randomForest", "pdp", "car", "gridExtra")
+new_packages <- required_packages[!required_packages %in% installed.packages()[, "Package"]]
+if (length(new_packages)) install.packages(new_packages)
+
 library(tidyverse)
 library(caret)
 library(isotree)
 library(e1071)
 library(randomForest)
+library(pdp)
+library(car)
+library(gridExtra)
 set.seed(42)
 ```
 
@@ -284,6 +292,111 @@ fisher_results <- fisher.test(contingency_table,
 fisher_results
 ```
 
+---
+
+## Isolation Forest Explainability
+
+``` {r}
+# --- Feature distributions: Anomalous vs. Normal ---
+data_clean %>%
+  select(Speed, Acceleration, YawRate, Is_Anomaly) %>%
+  pivot_longer(-Is_Anomaly, names_to = "Feature", values_to = "Value") %>%
+  ggplot(aes(x = Is_Anomaly, y = Value, fill = Is_Anomaly)) +
+  geom_violin(alpha = 0.6, trim = TRUE) +
+  geom_boxplot(width = 0.12, outlier.size = 0.8, alpha = 0.8) +
+  facet_wrap(~Feature, scales = "free_y") +
+  scale_fill_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
+  labs(
+    title = "Kinematic Feature Distributions: Normal vs. Anomalous Agents",
+    subtitle = "Anomalies are concentrated at the tails of each distribution",
+    x = "Is Anomaly", y = "Value", fill = "Anomaly"
+  ) +
+  theme_minimal()
+```
+
+``` {r}
+# --- Anomaly score vs. each feature (scatter with LOESS) ---
+features_to_plot <- c("Speed", "Acceleration", "YawRate")
+
+plots <- lapply(features_to_plot, function(feat) {
+  ggplot(data_clean, aes_string(x = feat, y = "AnomalyScore",
+                                color = "Is_Anomaly")) +
+    geom_point(alpha = 0.3, size = 0.8) +
+    geom_smooth(aes(group = 1), method = "loess", se = FALSE,
+                color = "black", linewidth = 0.8) +
+    geom_hline(yintercept = quantile(data_clean$AnomalyScore, 0.99),
+               linetype = "dashed", color = "red") +
+    scale_color_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
+    labs(title = paste("Anomaly Score vs.", feat),
+         subtitle = "Red dashed line = 99th percentile threshold",
+         x = feat, y = "Anomaly Score") +
+    theme_minimal() +
+    theme(legend.position = "none")
+})
+
+grid.arrange(grobs = plots, ncol = 2,
+             top = "Isolation Forest: Score Sensitivity per Feature")
+```
+
+``` {r}
+# --- Permutation feature importance for Isolation Forest ---
+# Measures how much the anomaly score distribution shifts when a feature is shuffled
+set.seed(42)
+kinematic_features <- c("Speed", "Acceleration", "YawRate")
+baseline_scores    <- data_clean$AnomalyScore
+
+perm_importance <- sapply(kinematic_features, function(feat) {
+  shuffled       <- data_clean[, kinematic_features]
+  shuffled[[feat]] <- sample(shuffled[[feat]])
+  perm_scores    <- predict(iso_model, shuffled)
+  # Importance = mean absolute deviation from baseline when feature is destroyed
+  mean(abs(perm_scores - baseline_scores))
+})
+
+perm_df <- data.frame(
+  Feature    = names(perm_importance),
+  Importance = perm_importance
+) %>% arrange(desc(Importance))
+
+ggplot(perm_df, aes(x = reorder(Feature, Importance), y = Importance, fill = Feature)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    title    = "Isolation Forest: Permutation Feature Importance",
+    subtitle = "Higher value = shuffling this feature disrupts anomaly scores more",
+    x = "", y = "Mean |Score Deviation|"
+  ) +
+  theme_minimal()
+
+print(perm_df)
+```
+
+``` {r}
+# --- Anomaly rate and mean score by AgentType ---
+agent_summary <- data_clean %>%
+  group_by(AgentType) %>%
+  summarise(
+    Count        = n(),
+    Anomaly_Rate = mean(Is_Anomaly == "Yes"),
+    Mean_Score   = mean(AnomalyScore),
+    .groups      = "drop"
+  )
+
+p1 <- ggplot(agent_summary, aes(x = AgentType, y = Anomaly_Rate, fill = AgentType)) +
+  geom_col(show.legend = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Anomaly Rate by Agent Type", x = "", y = "% Flagged as Anomalous") +
+  theme_minimal()
+
+p2 <- ggplot(agent_summary, aes(x = AgentType, y = Mean_Score, fill = AgentType)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Isolation Forest Score") +
+  theme_minimal()
+
+grid.arrange(p1, p2, ncol = 2)
+print(agent_summary)
+```
+
 ``` {r}
 # Train/Test Split
 trainIndex <- createDataPartition(data_clean$Is_Anomaly,
@@ -336,6 +449,59 @@ conf_matrix <- confusionMatrix(predictions,
 conf_matrix
 ```
 
+---
+
+## Random Forest Explainability
+
+``` {r}
+# --- Variable Importance ---
+rf_importance <- varImp(model_rf, scale = TRUE)
+
+plot(rf_importance,
+     main = "Random Forest: Variable Importance (Mean Decrease in Gini)")
+
+# Print numeric values
+print(rf_importance)
+```
+
+``` {r}
+# --- Partial Dependence Plots (marginal effect of each feature on P(Anomaly)) ---
+pd_yawrate <- partial(model_rf, pred.var = "YawRate",
+                      which.class = "Yes", prob = TRUE, train = train_balanced)
+pd_length  <- partial(model_rf, pred.var = "Length",
+                      which.class = "Yes", prob = TRUE, train = train_balanced)
+pd_width   <- partial(model_rf, pred.var = "Width",
+                      which.class = "Yes", prob = TRUE, train = train_balanced)
+
+p_yr <- autoplot(pd_yawrate) +
+  labs(title = "PDP: Yaw Rate", subtitle = "Effect on P(Anomaly = Yes)",
+       x = "YawRate (rad/s)", y = "Predicted P(Anomaly)") +
+  theme_minimal()
+
+p_ln <- autoplot(pd_length) +
+  labs(title = "PDP: Agent Length", subtitle = "Effect on P(Anomaly = Yes)",
+       x = "Length (m)", y = "Predicted P(Anomaly)") +
+  theme_minimal()
+
+p_wd <- autoplot(pd_width) +
+  labs(title = "PDP: Agent Width", subtitle = "Effect on P(Anomaly = Yes)",
+       x = "Width (m)", y = "Predicted P(Anomaly)") +
+  theme_minimal()
+
+grid.arrange(p_yr, p_ln, p_wd, ncol = 2,
+             top = "Partial Dependence Plots: Marginal Feature Effects on Anomaly Probability")
+```
+
+``` {r}
+# --- Two-way PDP: interaction between YawRate and Width ---
+pd_2way <- partial(model_rf, pred.var = c("YawRate", "Width"),
+                   which.class = "Yes", prob = TRUE, train = train_balanced)
+
+plotPartial(pd_2way,
+            main  = "2-Way PDP: YawRate × Width Interaction on P(Anomaly)",
+            xlab  = "YawRate (rad/s)", ylab = "Width (m)",
+            col.regions = heat.colors(100))
+```
 
 #Linear Regression on Future Distance 5s: 
 
@@ -459,4 +625,117 @@ results_with
 results_without
 ```
 
+---
+
+## Linear Regression Explainability
+
+``` {r}
+# Fit plain lm() models for explainability (caret wraps lm, so we refit for diagnostics)
+lm_with    <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                 data = data_with_stationary)
+lm_without <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                 data = data_no_stationary)
+
+summary(lm_with)
+summary(lm_without)
+```
+
+``` {r}
+# --- Coefficient plot with 95% CI (both datasets overlaid) ---
+extract_coefs <- function(model, label) {
+  ci  <- confint(model)
+  est <- coef(model)
+  data.frame(
+    Term     = rownames(ci),
+    Estimate = est,
+    Lower    = ci[, 1],
+    Upper    = ci[, 2],
+    Dataset  = label,
+    stringsAsFactors = FALSE
+  )
+}
+
+coef_df <- bind_rows(
+  extract_coefs(lm_with,    "With Stationary"),
+  extract_coefs(lm_without, "Without Stationary")
+) %>% filter(Term != "(Intercept)")
+
+ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
+                    color = Dataset, shape = Dataset)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper),
+                position = position_dodge(width = 0.5), width = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  coord_flip() +
+  labs(
+    title    = "Regression Coefficients with 95% Confidence Intervals",
+    subtitle = "Comparing models with vs. without stationary agents",
+    x = "", y = "Coefficient (metres per unit)"
+  ) +
+  theme_minimal()
+```
+
+``` {r}
+# --- Standardized (beta) coefficients for relative importance ---
+# Scale all continuous predictors to mean=0, SD=1 before fitting
+std_formula <- FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
+
+scale_df <- function(df) {
+  df %>% mutate(across(c(Speed, Acceleration, YawRate, Vel_X, Vel_Y, FutureDist_5s),
+                       ~ as.numeric(scale(.))))
+}
+
+lm_with_std    <- lm(std_formula, data = scale_df(data_with_stationary))
+lm_without_std <- lm(std_formula, data = scale_df(data_no_stationary))
+
+std_coef_df <- bind_rows(
+  data.frame(Term = names(coef(lm_with_std)[-1]),
+             Beta = coef(lm_with_std)[-1],
+             Dataset = "With Stationary"),
+  data.frame(Term = names(coef(lm_without_std)[-1]),
+             Beta = coef(lm_without_std)[-1],
+             Dataset = "Without Stationary")
+)
+
+ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    title    = "Standardized Regression Coefficients (β)",
+    subtitle = "Magnitude reflects relative importance; sign shows direction",
+    x = "", y = "Standardized Coefficient (β)"
+  ) +
+  theme_minimal()
+
+print(std_coef_df)
+```
+
+``` {r}
+# --- Variance Inflation Factors (multicollinearity check) ---
+cat("=== VIF: With Stationary ===\n")
+print(vif(lm_with))
+
+cat("\n=== VIF: Without Stationary ===\n")
+print(vif(lm_without))
+```
+
+``` {r}
+# --- Added-Variable (Partial Regression) Plots ---
+# Shows the unique contribution of each predictor after accounting for all others.
+# Points off the horizontal = leverage observations; slope = partial coefficient.
+par(mfrow = c(1, 1))
+avPlots(lm_without,
+        main = "Added-Variable Plots (Moving Agents Only)",
+        ask  = FALSE)
+```
+
+``` {r}
+# --- Component + Residual Plots (non-linearity check) ---
+# A non-linear smooth (pink) diverging from the straight line suggests a
+# predictor needs a transformation (e.g., log-speed or speed²).
+crPlots(lm_without,
+        main = "Component + Residual Plots (Moving Agents Only)",
+        ask  = FALSE)
+```
 
