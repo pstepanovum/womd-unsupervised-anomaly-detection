@@ -1,0 +1,236 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+
+
+df_miles <- read.csv("womd-unsupervised-anomaly-detection/data/raw/CSV1 - RO Miles per Location 202009-202512-2022benchmark.csv")
+df <- read.csv("womd-unsupervised-anomaly-detection/data/raw/CSV2 - Crashes with SGO ID and Group Membership 202009-202512-2022benchmark.csv")
+df_bench <- read.csv("womd-unsupervised-anomaly-detection/data/raw/CSV3 - Collision Counts and Comparison to Benchmarks 202009-202512-2022benchmark.csv")
+
+```
+
+```{r}
+df$Date <- as.Date(paste0(df$Year.Month, "01"), format="%Y%m%d")
+
+monthly_trends <- df %>%
+  group_by(Date) %>%
+  summarise(
+    Total_Incidents = n(),
+    Injury_Incidents = sum(Is.Any.Injury.Reported == "True" | Is.Any.Injury.Reported == "TRUE", na.rm = TRUE)
+  )
+
+# Colors
+waymo_blue  <- "#007AFF"
+waymo_green <- "#00D179"
+waymo_navy  <- "#0B1B32"
+
+# Create Plot
+p <- ggplot(monthly_trends, aes(x = Date)) +
+  # Total incidents - increased size for visibility on big screens
+  geom_line(aes(y = Total_Incidents, color = "Total Reported Incidents"), size = 1.5) +
+  geom_point(aes(y = Total_Incidents, color = "Total Reported Incidents"), size = 4) +
+  
+  # Injury Incidents
+  geom_line(aes(y = Injury_Incidents, color = "Injury-Reported Incidents"), size = 1.5) +
+  geom_point(aes(y = Injury_Incidents, color = "Injury-Reported Incidents"), size = 4, shape = 15) +
+  
+  scale_color_manual(values = c("Total Reported Incidents" = waymo_blue, 
+                                 "Injury-Reported Incidents" = waymo_green)) +
+  labs(
+    title = "Scaling Safety: Monthly Incident Trends (2020-2025)",
+    subtitle = "Tracking total incidents vs. injury-reported events as operations scale",
+    x = "Year",
+    y = "Monthly Count",
+    color = ""
+  ) +
+  theme_minimal(base_size = 18) + # Increased base font size for the whole plot
+  theme(
+    text = element_text(color = waymo_navy),
+    plot.title = element_text(face = "bold", size = 28, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 18, color = "gray40", margin = margin(b = 20)),
+    legend.position = "top",
+    legend.text = element_text(size = 16),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(size = 14),
+    panel.grid.minor = element_blank(),
+    # Changed from white to light gray so you can actually see the grid on a slide
+    panel.grid.major = element_line(linetype = "dashed", color = "gray90"),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+ggsave("/Users/ramses/Downloads/waymo_safety_trend_R.png", 
+       plot = p, 
+       width = 30, 
+       height = 5, 
+       dpi = 300)
+```
+
+
+
+
+```{r}
+regional_data <- df_bench %>%
+  filter(
+    County.Name != "All Locations (mileage blended)",
+    Grouping.Type == "All Crashes",
+    Conflict.Partner.Type.Group == "All Crashes"
+  ) %>%
+  mutate(Reduction_Pct = Waymo.Percent.Reduction * -100)
+
+# Colors
+waymo_green <- "#00D179"
+waymo_navy  <- "#0B1B32"
+
+p <- ggplot(regional_data, aes(x = Reduction_Pct, y = Outcome)) +
+
+geom_boxplot(fill = waymo_green, 
+               color = waymo_navy, 
+               alpha = 0.8, 
+               size = 0.6,
+               outlier.colour = waymo_navy, 
+               outlier.shape = 18, 
+               outlier.size = 2.5) +
+  
+  # Formatting
+  scale_x_continuous(limits = c(0, 105), breaks = seq(0, 100, 20)) +
+  labs(
+    title = "Regional Reliability: Safety Reductions Across All Operating Cities",
+    subtitle = "The boxes show consistent performance; dots represent statistical outliers in specific counties.",
+    x = "Percent Reduction in Crash Rate (%)",
+    y = ""
+  ) +
+  theme_minimal(base_size = 18) +
+  theme(
+    text = element_text(color = waymo_navy),
+    plot.title = element_text(face = "bold", size = 16, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 12, color = "gray40", margin = margin(b = 20)),
+    plot.title.position = "plot",
+    axis.title.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(linetype = "dashed", color = "gray90", size = 0.2),
+    plot.margin = margin(20, 40, 20, 20)
+  )
+
+
+ggsave("womd-unsupervised-anomaly-detection/data/raw/waymo_regional_reliability_with_outliers.png", 
+       plot = p, 
+       width = 8, 
+       height = 4, 
+       dpi = 300)
+```
+
+
+```{r}
+
+df_plot <- df_miles %>%
+  filter(!County.Name %in% c("All Locations (mileage blended)", "San Francisco Bay Area"))
+
+# Colors
+waymo_blue  <- "#007AFF"
+waymo_navy  <- "#0B1B32"
+
+
+p <- ggplot(df_plot, aes(x = reorder(County.Name, Waymo.RO.Miles..Millions.), 
+                         y = Waymo.RO.Miles..Millions.)) +
+
+geom_col(fill = waymo_blue, width = 0.7) +
+  coord_flip() + 
+  
+# Labels and Title
+  labs(
+    title = "Scaling the Mission: Rider-Only (RO) Miles per Location",
+    subtitle = "Cumulative miles driven across major service areas (Millions of Miles)",
+    x = "",
+    y = "Miles (Millions)"
+  ) +
+  
+  
+  theme_minimal(base_size = 18) +
+  theme(
+    text = element_text(color = waymo_navy),
+
+    plot.title = element_text(face = "bold", size = 16, margin = margin(b = 10), hjust = 0),
+    plot.subtitle = element_text(size = 12, color = "gray40", margin = margin(b = 20), hjust = 0),
+    plot.title.position = "plot", 
+    axis.title.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    
+    
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", color = "gray90"),
+    
+    plot.margin = margin(20, 40, 20, 20)
+  )
+
+ggsave("womd-unsupervised-anomaly-detection/results/images/waymo_miles_per_location_wide.png", 
+       plot = p, 
+       width = 8, 
+       height = 4, 
+       dpi = 300)
+```
+
+
+
+```{r}
+
+
+final_metrics <- df_bench %>%
+  filter(
+    Outcome %in% c("Police Report", "Any Injury", "Any Airbag Deployment", "Suspected Serious Injury+"),
+    County.Name == "All Locations (mileage blended)",
+    Grouping.Type == "All Crashes",
+    grepl("non-Dynamic", Benchmark.Comparison)
+  ) %>%
+  select(Outcome, Waymo.Count, Predicted.Benchmark.Count) %>%
+  # Pivot for ggplot
+  pivot_longer(cols = c(Waymo.Count, Predicted.Benchmark.Count), 
+               names_to = "Driver", values_to = "Count") %>%
+  mutate(Driver = ifelse(Driver == "Waymo.Count", "Waymo Driver", "Human Benchmark"))
+
+# Colors
+waymo_green <- "#00D179"
+waymo_navy  <- "#0B1B32"
+
+# Plot
+p <- ggplot(final_metrics, aes(x = reorder(Outcome, Count), y = Count, fill = Driver)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  coord_flip() +
+  scale_fill_manual(values = c("Waymo Driver" = waymo_navy, "Human Benchmark" = waymo_green)) +
+  labs(
+    title = "The Bottom Line: Real-World Safety Impact",
+    subtitle = "Actual Waymo incidents vs. Predicted human benchmark incidents over 170M miles",
+    x = "",
+    y = "Total Number of Incidents",
+    fill = ""
+  ) +
+  theme_minimal(base_size = 18) +
+  theme(
+    plot.title = element_text(face = "bold", size = 28, hjust = 0),
+    plot.subtitle = element_text(size = 18, color = "gray40", hjust = 0),
+    plot.title.position = "plot",
+    legend.position = "top",
+    axis.text.y = element_text(face = "bold", size = 16),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", color = "gray90")
+  )
+
+
+ggsave("womd-unsupervised-anomaly-detection/results/images/final_safety_summary.png", width = 13.33, height = 7, dpi = 300)
+
+```
+
+
+
+
+
