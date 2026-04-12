@@ -179,10 +179,18 @@ $$\Delta d_{5s} = \beta_0 + \beta_1 \cdot \text{Speed} + \beta_2 \cdot \text{Acc
 
 **[Anomaly Detection]**
 
-- **46 flagged** agents — two categories:
+- **46 flagged** agents out of 4,538 — two categories:
   - **Genuine extremes:** 3 agents at 25–50 m/s (up to 180 km/h, 355 m/s² acceleration)
   - **Sensor artifact:** 17 near-stationary agents with YawRate ≈ ±31 rad/s — physically impossible, numerical instability at near-zero speed
 - **IsInteractive = False for all top 20** — kinematic outlier ≠ safety incident
+
+**[Videos — three scenarios shown]**
+
+| Video | Scenario | Speed | Accel | IF Score | Category |
+| ----- | -------- | ----- | ----- | -------- | -------- |
+| vehicle_01 | `909244b8…` | **49.75 m/s** (180 km/h) | 355.78 m/s² | 0.870 | Genuine extreme |
+| anomaly_02 | `5baef16b…` | **24.92 m/s** | 230.99 m/s² | 0.853 | Genuine extreme |
+| anomaly_10 | `262112a6…` | < 3 m/s | — | — | Sensor artifact (YawRate ≈ ±31 rad/s) |
 
 **[Feature Importance]**
 

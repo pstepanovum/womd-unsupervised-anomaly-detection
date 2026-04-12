@@ -145,13 +145,19 @@
 
 **[Show anomalous agent video clips — ~45 seconds]**
 
-> These are actual scenario clips from the Waymo dataset, centered on the agents our Isolation Forest flagged as most anomalous.
->
-> The flagged agents fall into two distinct categories — and the split is instructive.
->
-> The first is **genuine kinematic extremes**. Two agents were flagged for truly unusual speed and acceleration: one vehicle reaching **49.75 m/s — roughly 180 km/h** — with an acceleration reading of 355 m/s². Another at 32 m/s, another at 25 m/s. In urban scenario context, these are real outliers.
->
-> The second category — and this accounts for seventeen of the top twenty — is a **sensor artifact**. Near-stationary agents, across all three agent types, with yaw rate fixed at exactly ±31 rad/s. A rotation rate of 31 radians per second is not physically possible for any ground vehicle. The pattern is unmistakable: near-zero speed, always the same magnitude, appearing in vehicles, pedestrians, and cyclists alike. This is numerical instability in the heading derivative computation when speed approaches zero. The model flagged real structure in the data — we suspect that the structure reflects a measurement issue, not a driving incident.
+> These are three actual scenario clips from the Waymo dataset, centered on the agents our Isolation Forest flagged as most anomalous. They represent both categories of what we found.
+
+**[Video 1 — vehicle_01, scenario 909244b8]**
+
+> The first video: a vehicle reaching **49.75 m/s — roughly 180 km/h** — with an acceleration reading of 355 m/s². That is a genuine kinematic extreme. In an urban driving scenario, that speed is far outside normal operating range.
+
+**[Video 2 — anomaly_02, scenario 5baef16b]**
+
+> Second video: another vehicle flagged for high acceleration — **24.92 m/s, 230.99 m/s²**. Again a real outlier in speed and dynamics.
+
+**[Video 3 — anomaly_10, scenario 262112a6]**
+
+> Third video — and this one is different. This agent is nearly stationary, but its yaw rate is recorded at exactly **±31 rad/s**. A rotation rate of 31 radians per second is not physically possible for any ground vehicle. This is the sensor artifact — and it accounts for **17 of the top 20** flagged agents. Near-zero speed, always the same magnitude, appearing across vehicles, pedestrians, and cyclists. This is numerical instability in the heading derivative computation when speed approaches zero. The model flagged real structure in the data — it's just that the structure reflects a measurement issue, not a driving incident.
 >
 > There's one more detail worth highlighting: **none of the top 20 anomalies carry an IsInteractive flag from Waymo**. IsInteractive marks agents that are safety-relevant to the AV's immediate planning. Our most extreme kinematic outliers — the 180 km/h vehicle, the ±31 rad/s artifacts — were not flagged by Waymo as planning-relevant. We'll come back to what that means in discussion, but it's an important caveat to carry into the results.
 >
@@ -171,7 +177,7 @@
 
 > Before we get to the takeaways, I want to address what Justin flagged at the end of the results section — because it's the most important nuance in this project.
 >
-> The pipeline produced statistically validated results: Fisher's p = 0.0005, AUC of 0.887. The numbers look good. But when we actually inspect what was flagged, none of the top 20 anomalies were marked as safety-relevant by Waymo's own IsInteractive flag. That's not a failure of the model — it's a clarification of what the model is actually measuring. **A kinematic outlier is not the same thing as a safety incident.** IsInteractive reflects which agents are in close proximity to the AV during routine planning — adjacent lane vehicles, approaching intersections. Our flagged events — extreme speeds and sensor artifacts — exist outside that frame entirely.
+> The pipeline produced statistically validated results: Fisher's p = 0.0005. The numbers look good. But when we actually inspect what was flagged, none of the top 20 anomalies were marked as safety-relevant by Waymo's own IsInteractive flag. That's not a failure of the model — it's a clarification of what the model is actually measuring. **A kinematic outlier is not the same thing as a safety incident.** IsInteractive reflects which agents are in close proximity to the AV during routine planning — adjacent lane vehicles, approaching intersections. Our flagged events — extreme speeds and sensor artifacts — exist outside that frame entirely.
 >
 > What this means in practice: the pipeline is more accurately described as a **data quality and behavioral characterization tool** than a safety-incident detector. It found genuine extremes in the data, and it surfaced a systematic measurement problem that would have gone unnoticed without it. Both are useful contributions — but they require domain knowledge to interpret correctly. The danger is treating model outputs as ground truth without that context.
 >
