@@ -72,7 +72,7 @@
 
 ---
 
-## Slide 7-9 — Dataset Statistics (2 min) | Speaker: Justin
+## Slide 7-9 — Dataset Statistics (2 min) | Speaker: Justin (Done)
 
 **[Slide: agent type breakdown table, speed distribution histogram, correlation heatmap]**
 
@@ -92,9 +92,11 @@
 >
 > Here's the speed distribution across all three agent types. One thing stands out immediately: vehicles appear _slower_ than cyclists in the raw data — which seems wrong. It's entirely because a large fraction of vehicles are stopped at intersections. Once you filter to moving agents only, the expected ordering snaps back: vehicles fastest, then cyclists, then pedestrians. That's an important preprocessing consideration we carry into both models.
 
+> These results gave us some confidence in the intuition behind our starting data (vehicles moving faster than pedestrians)
+
 ---
 
-## Slide 6 — Methods: Anomaly Detection (2 min) | Speaker: Ramses
+## Slide 10-11 — Methods: Anomaly Detection (2 min) | Speaker: Ramses (Done)
 
 **[Slide: three-layer pipeline diagram]**
 
@@ -108,7 +110,7 @@
 
 ---
 
-## Slide 7 — Methods: Motion Prediction (1.5 min) | Speaker: Justin
+## Slide 12 — Methods: Motion Prediction (1.5 min) | Speaker: Justin
 
 **[Slide: linear regression formula, two dataset conditions visualized]**
 
@@ -122,7 +124,7 @@
 
 ---
 
-## Slide 8 — Results (3.5 min) | Speaker: Justin
+## Slide 13-14 — Results (3.5 min) | Speaker: Justin
 
 **[Slide: three result tables + video clips of flagged anomalous agents]**
 
@@ -156,7 +158,7 @@
 
 ---
 
-## Slide 9 — Discussion & Limitations (2 min) | Speaker: Ramses
+## Slide 15 — Discussion & Limitations (2 min) | Speaker: Ramses
 
 **[Slide: two key takeaways + limitations bullet list]**
 
@@ -176,7 +178,7 @@
 
 ---
 
-## Slide 10 — Conclusion & Future Work (1 min) | Speaker: Pavel
+## Slide 16 — Conclusion & Future Work (1 min) | Speaker: Pavel
 
 **[Slide: summary bullet points + future directions]**
 
@@ -200,7 +202,7 @@
 
 ---
 
-## Slide 11 — Q&A Buffer (1 min) | All
+## Slide 17 — Q&A Buffer (1 min) | All
 
 **Anticipated questions and prepared answers:**
 
@@ -225,12 +227,3 @@
 > The kinematic features we use — speed, acceleration, yaw rate — are universal to any tracked agent. The pipeline is dataset-agnostic. The specific thresholds and model weights would need retraining, but the methodology transfers directly. The sensor artifact finding (±31 rad/s at near-zero speed) may also appear in other datasets using the same heading derivative computation.
 
 ---
-
-## Delivery Tips
-
-- **Pace:** The script is calibrated for a natural speaking pace (~130 words/minute). Don't rush the results section — the videos need time to land.
-- **Transitions:** Each speaker should briefly introduce the next: _"I'll hand it over to Ramses who'll cover the dataset."_
-- **Videos:** Justin should pause briefly before and after the anomaly clips — let the visual register before continuing narration.
-- **IsInteractive nuance:** This is the most intellectually interesting finding in the project. Ramses should slow down here — it's counterintuitive and worth letting the audience process.
-- **Practice handoffs:** Key moments: Pavel → Ramses (after slide 2), Ramses → Pavel (after slide 3), Pavel → Ramses (after slide 4), Ramses → Justin (after slide 6), Justin → Ramses (after slide 8). Rehearse these.
-- **Time check:** At the 11-minute mark you should be finishing Slide 6 (anomaly detection methods). If behind, compress Slide 9 by cutting the IsInteractive paragraph to 2–3 sentences.
