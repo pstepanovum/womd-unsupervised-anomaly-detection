@@ -89,17 +89,23 @@
 
 ## Slide 5 — Waymo Dataset Statistics (2 min) | Speaker: Justin
 
-**[Slide: dataset breakdown — scenario counts, agent type distributions, speed distributions, interaction flags]**
+**[Slide: agent type breakdown table, speed distribution histogram, correlation heatmap]**
 
-> Before diving into the models, let me give you a sense of what this data actually looks like.
+> Before diving into the models, let me give you a feel for what this data actually looks like.
 >
-> We extracted from **300 scenarios** from the validation split of the Waymo Open Motion Dataset — specifically shard 00000-of-00150. That gives us **18,311 raw agent observations** across vehicles, pedestrians, cyclists, and the Waymo self-driving car itself, which we exclude from all analysis.
+> In terms of composition: vehicles make up roughly 70% of the dataset, pedestrians around 25%, and cyclists about 5%. The Waymo self-driving car — the SDC — is excluded from all analysis. This class imbalance matters: it affects the anomaly distribution and how we interpret per-class statistics.
 >
-> In terms of composition: vehicles make up the clear majority of the dataset, pedestrians account for roughly 25%, and cyclists around 5%. This imbalance matters because it affects both the anomaly detection and how we interpret per-class statistics.
+> **[Point to speed distribution histogram]**
 >
-> A few things worth noting about the raw data before any filtering. When you look at mean speeds including stationary agents, vehicles actually appear slower than cyclists — counterintuitive, and it's entirely because a large fraction of vehicles are stopped at intersections. The moment you filter to moving agents only, the expected ordering returns: vehicles fastest, then cyclists, then pedestrians.
+> Here's the speed distribution across all three agent types. One thing stands out immediately: vehicles appear *slower* than cyclists in the raw data — which seems wrong. It's entirely because a large fraction of vehicles are stopped at intersections. Once you filter to moving agents only, the expected ordering snaps back: vehicles fastest, then cyclists, then pedestrians. That's an important preprocessing consideration we carry into both models.
 >
-> Waymo also provides behavioral flags: IsInteractive marks agents relevant to the AV's immediate planning — typically nearby vehicles in adjacent lanes or at intersections. IsSDC identifies the self-driving car itself. These flags are not safety-incident labels — they're proximity-based planning annotations — and that distinction will matter when we interpret the anomaly results.
+> **[Point to correlation heatmap]**
+>
+> The heatmap here shows Pearson correlations across all kinematic features. The key finding: **yaw rate is essentially uncorrelated with everything else** — |r| ≤ 0.09 across the board. Length and width are nearly redundant at r ≈ 0.97. Speed and length share a weak positive relationship.
+>
+> This independence of yaw rate is not a nuisance — it's exactly what makes it a strong discriminating feature for anomaly detection. It carries information no other variable does. You'll see why that matters in the next slide.
+>
+> One last note on Waymo's behavioral flags: IsInteractive marks agents relevant to the AV's immediate planning — nearby vehicles at intersections. It is **not** a safety-incident label. That distinction will matter when we look at the results.
 
 ---
 
@@ -107,9 +113,7 @@
 
 **[Slide: three-layer pipeline diagram]**
 
-> Our anomaly detection pipeline has two layers.
->
-> A word first on feature selection, motivated by the correlation analysis. Yaw rate is uncorrelated with every other kinematic feature — |r| ≤ 0.09 across the board. That independence is exactly what makes it a strong discriminating signal: it carries information the other features don't.
+> Our anomaly detection pipeline has two layers — and as Justin just showed, the choice of yaw rate as a key feature comes directly from that correlation analysis.
 >
 > **Layer 1: Isolation Forest.**
 > We fit 100 trees on Speed, Acceleration, and YawRate. Each agent receives an anomaly score between 0 and 1. We threshold at the 99th percentile — flagging **46 agents** out of 4,538 as anomalous.

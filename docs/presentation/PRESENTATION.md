@@ -94,16 +94,9 @@ R — Statistical Modeling
 Results (Tables / Plots)
 ```
 
-**[Bottom — agent type breakdown]**
-
-| Agent Type      | Count (raw) | After preprocessing |
-| --------------- | ----------- | ------------------- |
-| Vehicle         | majority    | included            |
-| Pedestrian      | ~25%        | included            |
-| Cyclist         | ~5%         | included            |
-| SDC (AV itself) | removed     | excluded            |
-
 **Features extracted:** Speed · Acceleration · Yaw Rate · Vel_X · Vel_Y · Length · Width · FutureDist_5s
+
+**Preprocessing:** Two analysis datasets derived from the same CSV — anomaly detection uses strict filter (Speed > 0, Valid_Current, no NAs) → **4,538 agents**; regression uses permissive filter (NA removal only) → **6,614 agents**
 
 ---
 
@@ -111,24 +104,29 @@ Results (Tables / Plots)
 
 **[Header]** What the Data Looks Like
 
-**[Stat boxes]**
-
-| Scenarios | Raw Agents | Sampling Rate | Segment Length |
-| --------- | ---------- | ------------- | -------------- |
-| **300**   | **18,311** | **20 Hz**     | **20 seconds** |
-
 **[Agent type breakdown]**
 
-| Agent Type      | Share  | After preprocessing          |
+| Agent Type      | Share  | Notes                        |
 | --------------- | ------ | ---------------------------- |
-| Vehicle         | ~70%   | included                     |
-| Pedestrian      | ~25%   | included                     |
-| Cyclist         | ~5%    | included                     |
-| SDC (AV itself) | —      | excluded from all analysis   |
+| Vehicle         | ~70%   | Dominant class               |
+| Pedestrian      | ~25%   | More irregular motion        |
+| Cyclist         | ~5%    | Smallest class               |
+| SDC (AV itself) | —      | Excluded from all analysis   |
 
-**[Callout]**
+**[Show: speed_distribution.png — stacked histogram by agent type]**
 
-- Vehicles appear slower than cyclists when stationary agents included — filtering to moving agents restores expected ordering
+- Vehicles appear **slower** than cyclists when stationary agents included — counterintuitive
+- Filter to moving agents only → expected ordering restored: Vehicle > Cyclist > Pedestrian
+- Speed distribution is right-skewed (skewness ≈ 1.04)
+
+**[Show: correlation_heatmap.png]**
+
+- **YawRate is orthogonal** to all other features — |r| ≤ 0.09 across the board
+- Length–Width nearly redundant (r ≈ 0.97)
+- Speed–Length weak positive (r ≈ 0.28)
+
+**[Note]**
+
 - `IsInteractive` = proximity-based AV planning flag — **not a safety incident label**
 
 ---
@@ -213,10 +211,10 @@ $$\Delta d_{5s} = \beta_0 + \beta_1 \cdot \text{Speed} + \beta_2 \cdot \text{Acc
 
 **[Limitations]**
 
-- Pseudo-labels from IF, not verified ground truth — test specificity 0.667 reflects noise
 - Single snapshot per agent — ignores full 20-second trajectory
 - Linear regression — pedestrian/cyclist motion may be nonlinear
 - Only 300 scenarios — high-speed anomaly tail is underrepresented
+- YawRate sensor artifact (±31 rad/s) dominates flagged anomalies — filter needed before production use
 
 ---
 
