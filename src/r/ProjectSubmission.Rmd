@@ -103,7 +103,9 @@ cor_df <- as.data.frame(cor_matrix) %>%
   rownames_to_column("Var1") %>%
   pivot_longer(-Var1, names_to = "Var2", values_to = "Correlation")
 
-ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
+dir.create("../../docs/images", recursive = TRUE, showWarnings = FALSE)
+
+p_heatmap <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
   geom_tile(color = "white", linewidth = 0.5) +
   geom_text(aes(label = round(Correlation, 2)), size = 3.5, fontface = "bold") +
   scale_fill_gradient2(low = "tomato", mid = "white", high = "steelblue",
@@ -113,29 +115,10 @@ ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
        x = "", y = "") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
 
-```{r}
-# Pairs scatter plot — colored by AgentType
-pairs(data_clean[, kinematic_vars],
-      col = adjustcolor(
-              c("Vehicle" = "steelblue",
-                "Pedestrian" = "tomato",
-                "Cyclist" = "seagreen")[as.character(data_clean$AgentType)],
-              alpha.f = 0.2),
-      pch  = 16,
-      cex  = 0.3,
-      main = "Feature Pairs Plot (Blue=Vehicle, Red=Pedestrian, Green=Cyclist)")
-```
-
-```{r}
-# Correlation broken down by AgentType
-for (ag in levels(data_clean$AgentType)) {
-  subset_ag <- data_clean %>% filter(AgentType == ag)
-  cor_ag <- cor(subset_ag[, kinematic_vars], use = "complete.obs")
-  cat("\n=== Correlation:", ag, "(n =", nrow(subset_ag), ") ===\n")
-  print(round(cor_ag, 3))
-}
+ggsave("../../docs/images/correlation_heatmap.png", plot = p_heatmap,
+       width = 7, height = 6, dpi = 300)
+p_heatmap
 ```
 
 ```{r}
@@ -264,13 +247,17 @@ perm_df <- data.frame(
   Importance = perm_importance
 ) %>% arrange(desc(Importance))
 
-ggplot(perm_df, aes(x = reorder(Feature, Importance), y = Importance, fill = Feature)) +
+p_iso_importance <- ggplot(perm_df, aes(x = reorder(Feature, Importance), y = Importance, fill = Feature)) +
   geom_col(show.legend = FALSE) +
   coord_flip() +
   labs(title    = "Isolation Forest: Permutation Feature Importance",
        subtitle = "Higher = shuffling this feature disrupts anomaly scores more",
        x = "", y = "Mean |Score Deviation|") +
   theme_minimal()
+
+ggsave("../../docs/images/iso_forest_feature_importance.png", plot = p_iso_importance,
+       width = 7, height = 5, dpi = 300)
+p_iso_importance
 
 print(perm_df)
 ```
@@ -295,6 +282,9 @@ p2 <- ggplot(agent_summary, aes(x = AgentType, y = Mean_Score, fill = AgentType)
   labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Score") +
   theme_minimal()
 
+g_agent <- arrangeGrob(p1, p2, ncol = 2)
+ggsave("../../docs/images/anomaly_rate_by_agent_type.png", plot = g_agent,
+       width = 10, height = 5, dpi = 300)
 grid.arrange(p1, p2, ncol = 2)
 print(agent_summary)
 ```
@@ -380,7 +370,7 @@ coef_df <- bind_rows(
   extract_coefs(lm_without, "Without Stationary")
 ) %>% filter(Term != "(Intercept)")
 
-ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
+p_coef_ci <- ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
                     color = Dataset, shape = Dataset)) +
   geom_point(position = position_dodge(width = 0.5), size = 3) +
   geom_errorbar(aes(ymin = Lower, ymax = Upper),
@@ -391,6 +381,10 @@ ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
        subtitle = "With vs. without stationary agents",
        x = "", y = "Coefficient (metres per unit)") +
   theme_minimal()
+
+ggsave("../../docs/images/regression_coefficients_ci.png", plot = p_coef_ci,
+       width = 8, height = 5, dpi = 300)
+p_coef_ci
 ```
 
 ```{r}
@@ -412,7 +406,7 @@ std_coef_df <- bind_rows(
              Beta = coef(lm_without_std)[-1], Dataset = "Without Stationary")
 )
 
-ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
+p_std_coef <- ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
   geom_col(position = "dodge") +
   coord_flip() +
   geom_hline(yintercept = 0, linetype = "dashed") +
@@ -421,21 +415,16 @@ ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset))
        x = "", y = "β") +
   theme_minimal()
 
+ggsave("../../docs/images/regression_feature_importance.png", plot = p_std_coef,
+       width = 7, height = 5, dpi = 300)
+p_std_coef
+
 print(std_coef_df)
 ```
+
 
 ```{r}
 # VIF — multicollinearity check
 cat("=== VIF: With Stationary ===\n");    print(vif(lm_with))
 cat("\n=== VIF: Without Stationary ===\n"); print(vif(lm_without))
-```
-
-```{r}
-# Added-variable plots — unique contribution of each predictor
-avPlots(lm_without, main = "Added-Variable Plots (Moving Agents)", ask = FALSE)
-```
-
-```{r}
-# Component + residual plots — linearity check
-crPlots(lm_without, main = "Component + Residual Plots (Moving Agents)", ask = FALSE)
 ```

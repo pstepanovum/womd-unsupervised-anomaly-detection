@@ -1,0 +1,136 @@
+Key Model Results — Waymo Unsupervised Anomaly Detection
+Generated: 2026-04-11
+Source: results/Waymo_Anomaly_Detection.nb.html
+==========================================================================
+
+DATASET SIZES
+-------------
+Raw dataset:                        18,311 agents × 19 features
+Anomaly detection (data_clean):      4,538 agents  (Speed > 0, Valid_Current == True, no NAs)
+  └─ Normal:                         4,492
+  └─ Anomalous (top 1%):                46
+Regression — with stationary:        6,614 agents  (NA removal only)
+Regression — without stationary:     3,196 agents  (Speed > 0)
+
+==========================================================================
+STEP 1 — EDA: CORRELATION
+==========================================================================
+
+YawRate Pearson correlations with all other features: |r| ≤ 0.09
+Speed–Length correlation:            r ≈ 0.28  (weak positive)
+Length–Width correlation:            r ≈ 0.97  (near-redundant)
+
+Speed skewness (moving agents):      1.04
+
+Mean speed by agent type — ALL agents (including stationary):
+  Vehicle:     2.47 m/s
+  Cyclist:     4.20 m/s
+  Pedestrian:  1.01 m/s
+
+Mean speed by agent type — MOVING agents only (Speed > 0):
+  Vehicle:     6.74 m/s
+  Cyclist:     3.92 m/s
+  Pedestrian:  1.07 m/s
+
+==========================================================================
+STEP 2 — ISOLATION FOREST: ANOMALY DETECTION
+==========================================================================
+
+Model:          Isolation Forest, 100 trees
+Features:       Speed, Acceleration, YawRate
+Threshold:      99th percentile anomaly score
+Flagged:        46 out of 4,538 (~1%)
+
+Fisher's Exact Test (Monte Carlo, 2,000 replicates):
+  p-value = 0.0004998
+  Interpretation: anomalies are non-uniformly distributed across agent types
+
+Permutation Feature Importance (Isolation Forest):
+  [See plot in Rmd — YawRate highest, then Speed, then Acceleration]
+
+Top 3 genuine anomalies (high speed/acceleration):
+  ScenarioID: 909244b878c6c203  AgentID: 1409  Vehicle   Speed: 49.75 m/s  Accel: 355.78 m/s²  Score: 0.870
+  ScenarioID: c014d3c05600714f  AgentID:  560  Vehicle   Speed: 32.43 m/s  Accel: 239.87 m/s²  Score: 0.804
+  ScenarioID: 5baef16beff3351   AgentID: 1554  Vehicle   Speed: 24.92 m/s  Accel: 230.99 m/s²  Score: 0.853
+
+Sensor artifact pattern (17 of top 20):
+  Near-stationary agents (Speed < 3 m/s) with YawRate ≈ ±31 rad/s
+  Appears across Vehicles, Pedestrians, and Cyclists
+  Consistent with numerical instability in heading derivative at near-zero speed
+
+IsInteractive flag for all top 20: FALSE
+  (None flagged as safety-relevant by Waymo's own planning annotations)
+
+==========================================================================
+STEP 2b — RANDOM FOREST CLASSIFIER (Supervised Characterization)
+==========================================================================
+
+Features:       Length, Width, YawRate
+Class balance:  Down-sampled to 37 No / 37 Yes (from 99:1 imbalance)
+CV:             5-fold, optimizing AUC-ROC
+
+Cross-validated results (mtry = 2, selected as optimal):
+  AUC-ROC:      0.8871
+  Sensitivity:  0.8357
+  Specificity:  0.8393
+
+Hold-out test set results:
+  Accuracy:          0.7949  (79.49%)
+  Balanced Accuracy: 0.7314  (73.14%)
+  Sensitivity:       0.7962
+  Specificity:       0.6667
+
+Confusion matrix (test set):
+              Reference
+  Prediction   No   Yes
+  No          715     3
+  Yes         183     6
+
+Kappa:         0.0425
+Note: low Kappa reflects the extreme class imbalance in the test set (99:1)
+
+==========================================================================
+STEP 3 — LINEAR REGRESSION: 5-SECOND DISPLACEMENT
+==========================================================================
+
+Model:    FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y
+CV:       5-fold cross-validation
+Split:    80% train / 20% test
+
+--- Condition A: With stationary agents (n = 6,614) ---
+  Test RMSE:   7.44 m
+  Test R²:     0.8802
+  CV RMSE:     7.65 m
+  CV R²:       0.8856
+
+--- Condition B: Without stationary agents (n = 3,196) ---
+  Test RMSE:   13.15 m
+  Test R²:     0.7275
+  CV RMSE:     10.05 m
+  CV R²:       0.8602
+
+Standardized Beta Coefficients (feature importance — moving agents):
+  Speed:         β ≈  0.95   ← dominant predictor by wide margin
+  Vel_X:         β ≈  varies (direction-dependent)
+  Vel_Y:         β ≈  varies (direction-dependent)
+  Acceleration:  β ≈  small
+  YawRate:       β ≈ -0.007  ← near-zero contribution
+
+Interpretation: displacement over 5s is essentially determined by current
+velocity. YawRate, the key anomaly signal, contributes almost nothing here.
+
+==========================================================================
+KEY CONTRAST
+==========================================================================
+
+  Model                  | Key feature  | What it measures
+  -----------------------|--------------|---------------------------
+  Isolation Forest       | YawRate      | Is this agent behaving unusually?
+  RF Classifier          | YawRate +    | Can we characterize anomalous agents
+                         | geometry     | from their physical properties?
+  Linear Regression      | Speed        | Where will this agent be in 5 seconds?
+
+The two models are answering fundamentally different questions.
+Feature importance confirms this and agrees with physical intuition.
+
+==========================================================================
