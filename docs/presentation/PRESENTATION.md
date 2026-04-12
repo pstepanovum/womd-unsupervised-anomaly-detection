@@ -107,201 +107,159 @@ Results (Tables / Plots)
 
 ---
 
-## Slide 5 — Methods: Anomaly Detection
+## Slide 5 — Waymo Dataset Statistics
 
-**[Header]** Three-Layer Anomaly Detection Pipeline
+**[Header]** What the Data Looks Like
 
-**[Layer 1 box]**
+**[Stat boxes]**
 
-### Layer 1 — Isolation Forest
+| Scenarios | Raw Agents | Sampling Rate | Segment Length |
+| --------- | ---------- | ------------- | -------------- |
+| **300**   | **18,311** | **20 Hz**     | **20 seconds** |
 
-- Input features: **Speed, Acceleration, YawRate**
-- 100 trees, unsupervised, no labels
-- Assigns anomaly score ∈ [0, 1] to each agent
-- Threshold: **99th percentile → top 1% flagged**
-- Result: **46 anomalous agents** out of 4,538
+**[Agent type breakdown]**
 
-> Key idea: anomalies are rare and different — they get isolated in fewer random tree splits.
-
-**[Layer 2 box]**
-
-### Layer 2 — Statistical Validation (Fisher's Exact Test)
-
-|            | Normal | Anomalous |
-| ---------- | ------ | --------- |
-| Vehicle    | ...    | ...       |
-| Cyclist    | ...    | ...       |
-| Pedestrian | ...    | ...       |
-
-- Test: are anomalies distributed uniformly across agent types?
-- **p = 0.0005** (Monte Carlo, 2,000 replicates)
-- Anomalies cluster in specific agent types — **not random noise**
-
-**[Layer 3 box]**
-
-### Layer 3 — Random Forest Classifier
-
-- Uses IF scores as pseudo-labels
-- Features: **Length, Width, YawRate**
-- Down-sampled to handle 99:1 class imbalance
-- 5-fold CV optimizing AUC-ROC
-- Learns to characterize what anomalous agents look like
-
----
-
-## Slide 6 — Methods: Motion Prediction
-
-**[Header]** Linear Regression for 5-Second Displacement
-
-**[Model formula box]**
-
-$$\Delta d_{5s} = \beta_0 + \beta_1 \cdot \text{Speed} + \beta_2 \cdot \text{Acceleration} + \beta_3 \cdot \text{YawRate} + \beta_4 \cdot V_x + \beta_5 \cdot V_y$$
-
-**[Two experimental conditions — side by side]**
-
-|             | Condition A                   | Condition B                      |
-| ----------- | ----------------------------- | -------------------------------- |
-| **Dataset** | All agents                    | Moving agents only (Speed > 0)   |
-| **N**       | 6,614                         | 3,196                            |
-| **Purpose** | Baseline including easy cases | Honest evaluation under dynamics |
-
-**[Evaluation setup]**
-
-- 80 / 20 train / test split
-- 5-fold cross-validation on training set
-- Metrics: **RMSE** (meters) · **R²**
+| Agent Type      | Share  | After preprocessing          |
+| --------------- | ------ | ---------------------------- |
+| Vehicle         | ~70%   | included                     |
+| Pedestrian      | ~25%   | included                     |
+| Cyclist         | ~5%    | included                     |
+| SDC (AV itself) | —      | excluded from all analysis   |
 
 **[Callout]**
 
-> Stationary agents have near-zero displacement — trivially easy to predict.
-> The two conditions reveal whether R² reflects real predictive power or dataset composition.
+- Vehicles appear slower than cyclists when stationary agents included — filtering to moving agents restores expected ordering
+- `IsInteractive` = proximity-based AV planning flag — **not a safety incident label**
 
 ---
 
-## Slide 7 — Results
+## Slide 6 — Methods: Anomaly Detection
+
+**[Header]** Two-Layer Anomaly Detection Pipeline
+
+**[Layer 1]**
+
+### Layer 1 — Isolation Forest
+
+- Features: **Speed, Acceleration, YawRate** — YawRate uncorrelated with all others (|r| ≤ 0.09)
+- 100 trees, unsupervised, no labels
+- Threshold: **99th percentile → 46 flagged** out of 4,538
+
+**[Layer 2]**
+
+### Layer 2 — Statistical Validation
+
+- Fisher's Exact Test (Monte Carlo, 2,000 replicates)
+- **p = 0.0005** — anomalies cluster by agent type, not random noise
+
+---
+
+## Slide 7 — Methods: Motion Prediction
+
+**[Header]** Linear Regression for 5-Second Displacement
+
+$$\Delta d_{5s} = \beta_0 + \beta_1 \cdot \text{Speed} + \beta_2 \cdot \text{Acceleration} + \beta_3 \cdot \text{YawRate} + \beta_4 \cdot V_x + \beta_5 \cdot V_y$$
+
+**[Two conditions]**
+
+|             | Condition A               | Condition B                      |
+| ----------- | ------------------------- | -------------------------------- |
+| **Dataset** | All agents (n = 6,614)    | Moving only — Speed > 0 (n = 3,196) |
+| **Purpose** | Baseline with easy cases  | Honest dynamic evaluation        |
+
+- 80 / 20 train / test split · 5-fold CV · Metrics: **RMSE** · **R²**
+
+---
+
+## Slide 8 — Results
 
 **[Header]** Results
 
-**[Section A — Descriptive Statistics]**
+**[Anomaly Detection]**
 
-### Mean Speed by Agent Type (m/s)
+- **46 flagged** agents — two categories:
+  - **Genuine extremes:** 3 agents at 25–50 m/s (up to 180 km/h, 355 m/s² acceleration)
+  - **Sensor artifact:** 17 near-stationary agents with YawRate ≈ ±31 rad/s — physically impossible, numerical instability at near-zero speed
+- **IsInteractive = False for all top 20** — kinematic outlier ≠ safety incident
 
-| Agent Type | All Agents | Moving Only |
-| ---------- | ---------- | ----------- |
-| Vehicle    | 2.47       | **6.74**    |
-| Cyclist    | 4.20       | **3.92**    |
-| Pedestrian | 1.01       | **1.07**    |
+**[Feature Importance]**
 
-> Without filtering: vehicles appear _slower_ than cyclists due to stopped cars at intersections.
-> Filtering restores expected ordering.
+- Isolation Forest (permutation): **YawRate** dominant — anomaly signal lives in turning behavior
+- Regression: **Speed β ≈ 0.95** — displacement is a direct function of velocity; YawRate β ≈ -0.007
 
-**[Section B — Anomaly Detection Results]**
+**[Regression]**
 
-### Random Forest Classifier Performance
-
-| Metric            | CV (Train) | Test (Hold-out) |
-| ----------------- | ---------- | --------------- |
-| AUC-ROC           | **0.887**  | —               |
-| Sensitivity       | 0.836      | 0.796           |
-| Specificity       | 0.839      | 0.667           |
-| Accuracy          | —          | **79.5%**       |
-| Balanced Accuracy | —          | **73.1%**       |
-
-Fisher's Exact Test: **p = 0.0005** — anomalies are non-uniformly distributed across agent types.
-
-**[Section C — Motion Prediction Results]**
-
-### Linear Regression — 5-Second Displacement
-
-| Dataset            | Test RMSE  | Test R²   | CV RMSE | CV R² |
-| ------------------ | ---------- | --------- | ------- | ----- |
-| With stationary    | **7.44 m** | **0.880** | 7.65 m  | 0.886 |
-| Without stationary | 13.15 m    | 0.728     | 10.05 m | 0.860 |
+| Dataset            | Test RMSE  | Test R²   | CV RMSE | CV R²  |
+| ------------------ | ---------- | --------- | ------- | ------ |
+| With stationary    | **7.44 m** | **0.880** | 7.65 m  | 0.886  |
+| Without stationary | 13.15 m    | 0.728     | 10.05 m | 0.860  |
 
 ---
 
-## Slide 8 — Discussion & Limitations
+## Slide 9 — Discussion & Limitations
 
 **[Header]** What the Results Tell Us
 
-**[Two key takeaways — side by side boxes]**
+**[Key nuance]**
 
-**Takeaway 1: Unsupervised detection works**
+- **Kinematic outlier ≠ safety incident** — none of the top 20 anomalies were flagged by Waymo as planning-relevant
+- Pipeline better described as a **data quality + behavioral characterization tool** than a safety-incident detector
 
-- IF scores carry real discriminative signal
-- p = 0.0005 confirms structure, not noise
-- Anomalies concentrate in pedestrians / cyclists — consistent with irregular urban kinematics
+**[Takeaways]**
 
-**Takeaway 2: Dataset composition dominates metrics**
+- Unsupervised detection works and is statistically validatable — Fisher p = 0.0005
+- YawRate drives anomaly detection · Speed drives displacement — models answer fundamentally different questions
+- ΔR² = −0.15 when removing stationary agents — **benchmarks on mixed populations are inflated**
 
-- Removing stationary agents: ΔR² = −0.15
-- Not a model failure — a dataset artifact
-- **Benchmarks on mixed populations are inflated**
-- Moving-only evaluation is the honest number for dynamic AV deployment
+**[Limitations]**
 
-**[Limitations — bulleted]**
-
-- **Pseudo-labels:** 46 anomaly labels come from IF scores, not verified ground truth — test specificity of 0.667 reflects this noise
-- **Single frame:** We use one snapshot per agent, ignoring the full 20-second trajectory
-- **Linear model:** Pedestrian and cyclist motion may be nonlinear
-- **No temporal context:** Isolation Forest operates on instantaneous kinematics only
+- Pseudo-labels from IF, not verified ground truth — test specificity 0.667 reflects noise
+- Single snapshot per agent — ignores full 20-second trajectory
+- Linear regression — pedestrian/cyclist motion may be nonlinear
+- Only 300 scenarios — high-speed anomaly tail is underrepresented
 
 ---
 
-## Slide 9 — Conclusion & Future Work
+## Slide 10 — Conclusion & Future Work
 
 **[Header]** Summary & Next Steps
 
-**[Left — what we built]**
+**[Stage 1 — Anomaly Detection]**
 
-### Two-Stage Pipeline
+- Isolation Forest · Fisher p < 0.001
+- Surfaced genuine extremes + systematic sensor artifact
 
-**Stage 1 — Anomaly Detection**
+**[Stage 2 — Motion Prediction]**
 
-- Isolation Forest on Speed / Acceleration / Yaw Rate
-- Fisher's Exact Test: p < 0.001
-- Random Forest characterization: AUC = 0.887
+- Linear regression · R² = 0.88 (all agents) · R² = 0.73 (moving only)
+- Speed β ≈ 0.95 — strong classical baseline
 
-**Stage 2 — Motion Prediction**
+**[Future Work]**
 
-- Linear regression on 5 kinematic features
-- R² = 0.88 with stationary agents included
-- Strong classical baseline
+1. Filter YawRate at |yaw| < 10 rad/s to remove sensor artifact before anomaly detection
+2. Validate flagged agents against `IsInteractive` with appropriate caveats
+3. Incorporate full 20-second trajectory features
+4. Apply pipeline to full dataset — richer high-speed anomaly tail
 
-**[Right — future work]**
-
-### Next Steps
-
-1. Temporal features over the full 20-second trajectory
-2. Validate anomalies against Waymo's `IsInteractive` ground-truth flags
-3. Mahalanobis distance scoring as IF alternative
-4. Neural extensions benchmarked against these baselines
-
-**[Bottom — takeaway banner]**
-
-> Classical statistical methods deliver **interpretable, statistically validated safety insights** from large-scale real-world AV data — without deep learning.
+> Classical statistical methods deliver **interpretable, statistically validated safety insights** from real-world AV data — without deep learning.
 
 **Code:** github.com/pstepanovum/womd-unsupervised-anomaly-detection
 
 ---
 
-## Slide 10 — Q&A
+## Slide 11 — Q&A
 
 **[Header]** Thank You — Questions?
-
-**[Center]**
 
 **Pavel Stepanov** — pas273@miami.edu
 **Ramses Loaces** — rxl1238@miami.edu
 **Justin Cabrera** — justin.cabrera2718@gmail.com
-
-**[Bottom — quick reference for Q&A]**
 
 | Key Result                  | Value                                |
 | --------------------------- | ------------------------------------ |
 | Agents analyzed             | 4,538 (anomaly) · 6,614 (regression) |
 | Anomalies flagged           | 46 (top 1% by IF score)              |
 | Fisher's p-value            | 0.0005                               |
-| RF AUC-ROC                  | 0.887                                |
+| Speed β (regression)        | ≈ 0.95                               |
 | Regression R² (all agents)  | 0.880                                |
 | Regression R² (moving only) | 0.728                                |

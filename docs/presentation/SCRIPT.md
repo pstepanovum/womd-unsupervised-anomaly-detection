@@ -107,7 +107,7 @@
 
 **[Slide: three-layer pipeline diagram]**
 
-> Our anomaly detection pipeline has three layers.
+> Our anomaly detection pipeline has two layers.
 >
 > A word first on feature selection, motivated by the correlation analysis. Yaw rate is uncorrelated with every other kinematic feature — |r| ≤ 0.09 across the board. That independence is exactly what makes it a strong discriminating signal: it carries information the other features don't.
 >
@@ -116,9 +116,6 @@
 >
 > **Layer 2: Statistical Validation.**
 > We build a contingency table of agent type versus anomaly status and run **Fisher's Exact Test** with Monte Carlo simulation. Result: **p = 0.0005**. The anomalies are not uniformly distributed — certain agent types are disproportionately flagged. That's signal, not noise.
->
-> **Layer 3: Supervised Characterization.**
-> We use those Isolation Forest flags as pseudo-labels to train a **Random Forest classifier**. Features: bounding box dimensions and yaw rate. Because the class ratio is 99:1, we apply downsampling and evaluate by AUC-ROC under 5-fold cross-validation.
 
 ---
 
@@ -154,14 +151,6 @@
 >
 > There's one more detail worth highlighting: **none of the top 20 anomalies carry an IsInteractive flag from Waymo**. IsInteractive marks agents that are safety-relevant to the AV's immediate planning. Our most extreme kinematic outliers — the 180 km/h vehicle, the ±31 rad/s artifacts — were not flagged by Waymo as planning-relevant. We'll come back to what that means in discussion, but it's an important caveat to carry into the results.
 >
-> The Random Forest classifier trained on those pseudo-labels achieved:
-
-> - Cross-validated AUC-ROC of **0.887**
-> - Sensitivity 0.836, Specificity 0.839 on training data
-> - On the held-out test set: accuracy **79.5%**, balanced accuracy **73.1%**
->
-> Strong performance — especially given we're training on unsupervised pseudo-labels rather than verified ground truth. And it's worth noting what the classifier was actually learning from: its three features are **Length, Width, and YawRate** — agent geometry and turning behavior. Not speed. The anomaly characterization signal lives in how an agent is shaped and how it rotates, not how fast it moves.
-
 **[Transition to regression results]**
 
 > For motion prediction: with stationary agents included, test RMSE **7.44 meters**, R-squared **0.880**. Remove stationary agents and RMSE jumps to **13.15 meters**, R-squared drops to **0.728**.
@@ -184,11 +173,11 @@
 >
 > With that framing, two broader takeaways.
 >
-> First, **unsupervised detection works and is statistically validatable**. The Fisher test confirms structure in who gets flagged. Anomalies concentrate in pedestrians and cyclists — consistent with their more irregular urban kinematics. The Random Forest can characterize what anomalous agents look like at 0.887 AUC, even starting from noisy pseudo-labels.
+> First, **unsupervised detection works and is statistically validatable**. The Fisher test confirms structure in who gets flagged. Anomalies concentrate in pedestrians and cyclists — consistent with their more irregular urban kinematics.
 >
 > Second, **dataset composition dominates metrics**. The 15-point R-squared drop when removing stationary agents is not a model failure — it's a dataset artifact. Any evaluation reported on a mixed moving-and-stationary population is inflated. The 0.728 on moving agents is the honest number for dynamic AV deployment.
 >
-> On limitations: pseudo-labels from the Isolation Forest are not verified ground truth — the test specificity of 0.667 reflects that noise. We work from a single snapshot frame per agent, ignoring the full 20-second trajectory. Our regression is linear; pedestrian and cyclist motion may be nonlinear. And we only analyzed 300 scenarios — the genuine high-speed anomaly tail would be richer with the full dataset.
+> On limitations: we work from a single snapshot frame per agent, ignoring the full 20-second trajectory. Our regression is linear; pedestrian and cyclist motion may be nonlinear. And we only analyzed 300 scenarios — the genuine high-speed anomaly tail would be richer with the full dataset.
 
 ---
 
@@ -198,7 +187,7 @@
 
 > To summarize: we built a two-stage statistical pipeline for autonomous driving data.
 >
-> Stage one: Isolation Forest detects kinematic anomalies unsupervised. Fisher's Exact Test validates them at p < 0.001. A Random Forest characterizes them at 0.887 AUC. And manual inspection reveals both genuine extreme events and a systematic sensor artifact that only became visible through the anomaly detection step.
+> Stage one: Isolation Forest detects kinematic anomalies unsupervised. Fisher's Exact Test validates them at p < 0.001. Manual inspection reveals both genuine extreme events and a systematic sensor artifact that only became visible through the anomaly detection step.
 >
 > Stage two: Linear regression predicts 5-second displacement with R-squared of 0.88 — a strong classical baseline.
 >

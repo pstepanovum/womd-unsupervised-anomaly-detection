@@ -84,8 +84,8 @@ waymo_navy  <- "#1F233F"
 waymo_white <- "#FFFFFF"
 
 waymo_2col    <- c("With Stationary"    = waymo_blue,  "Without Stationary" = waymo_green)
-waymo_3col    <- c("Cyclist"            = waymo_blue,  "Pedestrian"         = waymo_green,
-                   "Vehicle"            = waymo_grey)
+waymo_3col    <- c("Cyclist"            = waymo_grey,  "Pedestrian"         = waymo_green,
+                   "Vehicle"            = waymo_blue)
 waymo_anomaly <- c("No"                 = waymo_green, "Yes"                = waymo_navy)
 waymo_feat    <- c("Speed"              = waymo_blue,  "Acceleration"       = waymo_green,
                    "YawRate"            = waymo_grey)
@@ -168,12 +168,19 @@ p_heatmap
 # Descriptive summary
 summary(data_clean[, c("Speed", "Acceleration", "YawRate")])
 
-hist(data_clean$Speed,
-     main = "Speed Distribution — All Agent Types",
-     xlab = "Speed (m/s)",
-     col  = waymo_blue,
-     border = waymo_white,
-     breaks = 40)
+p_speed <- ggplot(data_clean, aes(x = Speed, fill = AgentType)) +
+  geom_histogram(bins = 40, color = waymo_white, linewidth = 0.2, alpha = 0.9) +
+  scale_fill_manual(values = waymo_3col) +
+  labs(title    = "Speed Distribution — All Agent Types",
+       subtitle = "Moving agents only (Speed > 0); right-skewed across all classes",
+       x        = "Speed (m/s)",
+       y        = "Count",
+       fill     = "Agent Type") +
+  waymo_theme()
+
+ggsave("../../docs/images/speed_distribution.png", plot = p_speed,
+       width = 8, height = 5, dpi = 300, type = "cairo")
+p_speed
 
 cat("Speed skewness:", e1071::skewness(data_clean$Speed), "\n")
 cat("99th percentile acceleration:", quantile(data_clean$Acceleration, 0.99), "\n")
