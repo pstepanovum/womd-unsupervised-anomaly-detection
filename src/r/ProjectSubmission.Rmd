@@ -65,7 +65,49 @@ library(isotree)
 library(e1071)
 library(gridExtra)
 library(car)
+library(showtext)
 set.seed(42)
+
+# --- Waymo Font (Latin Modern Roman — the actual LaTeX font) ---
+font_add("LM Roman",
+         regular  = "~/Library/Fonts/lmroman10-regular.otf",
+         bold     = "~/Library/Fonts/lmroman10-bold.otf",
+         italic   = "~/Library/Fonts/lmroman10-italic.otf")
+showtext_auto()
+showtext_opts(dpi = 300)
+
+# --- Waymo Color Palette ---
+waymo_green <- "#00C389"
+waymo_blue  <- "#1A73E8"
+waymo_grey  <- "#8A8F94"
+waymo_navy  <- "#1F233F"
+waymo_white <- "#FFFFFF"
+
+waymo_2col    <- c("With Stationary"    = waymo_blue,  "Without Stationary" = waymo_green)
+waymo_3col    <- c("Cyclist"            = waymo_blue,  "Pedestrian"         = waymo_green,
+                   "Vehicle"            = waymo_grey)
+waymo_anomaly <- c("No"                 = waymo_green, "Yes"                = waymo_navy)
+waymo_feat    <- c("Speed"              = waymo_blue,  "Acceleration"       = waymo_green,
+                   "YawRate"            = waymo_grey)
+
+# --- Waymo ggplot Theme ---
+waymo_theme <- function(base_size = 12) {
+  theme_minimal(base_size = base_size) +
+  theme(
+    text             = element_text(family = "LM Roman", color = waymo_navy),
+    plot.title       = element_text(face = "bold", size = base_size + 2, color = waymo_navy),
+    plot.subtitle    = element_text(size = base_size - 1, color = waymo_grey),
+    axis.text        = element_text(color = waymo_navy),
+    axis.title       = element_text(color = waymo_navy),
+    panel.grid.major = element_line(color = "#E8EAED"),
+    panel.grid.minor = element_blank(),
+    legend.text      = element_text(color = waymo_navy),
+    legend.title     = element_text(color = waymo_navy, face = "bold"),
+    plot.background  = element_rect(fill = waymo_white, color = NA),
+    panel.background = element_rect(fill = waymo_white, color = NA),
+    strip.text       = element_text(color = waymo_navy, face = "bold")
+  )
+}
 ```
 
 ```{r}
@@ -106,18 +148,19 @@ cor_df <- as.data.frame(cor_matrix) %>%
 dir.create("../../docs/images", recursive = TRUE, showWarnings = FALSE)
 
 p_heatmap <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
-  geom_tile(color = "white", linewidth = 0.5) +
-  geom_text(aes(label = round(Correlation, 2)), size = 3.5, fontface = "bold") +
-  scale_fill_gradient2(low = "tomato", mid = "white", high = "steelblue",
+  geom_tile(color = waymo_white, linewidth = 0.5) +
+  geom_text(aes(label = round(Correlation, 2)), size = 3.5, fontface = "bold",
+            color = waymo_navy, family = "LM Roman") +
+  scale_fill_gradient2(low = waymo_blue, mid = waymo_white, high = waymo_green,
                        midpoint = 0, limits = c(-1, 1)) +
   labs(title = "Feature Correlation Heatmap — All Agent Types",
        subtitle = "YawRate is near-zero correlated with all other features",
        x = "", y = "") +
-  theme_minimal() +
+  waymo_theme() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ggsave("../../docs/images/correlation_heatmap.png", plot = p_heatmap,
-       width = 7, height = 6, dpi = 300)
+       width = 7, height = 6, dpi = 300, type = "cairo")
 p_heatmap
 ```
 
@@ -128,7 +171,8 @@ summary(data_clean[, c("Speed", "Acceleration", "YawRate")])
 hist(data_clean$Speed,
      main = "Speed Distribution — All Agent Types",
      xlab = "Speed (m/s)",
-     col  = "skyblue",
+     col  = waymo_blue,
+     border = waymo_white,
      breaks = 40)
 
 cat("Speed skewness:", e1071::skewness(data_clean$Speed), "\n")
@@ -203,10 +247,10 @@ data_clean %>%
   geom_violin(alpha = 0.6, trim = TRUE) +
   geom_boxplot(width = 0.12, outlier.size = 0.8, alpha = 0.8) +
   facet_wrap(~Feature, scales = "free_y") +
-  scale_fill_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
+  scale_fill_manual(values = waymo_anomaly) +
   labs(title = "Feature Distributions: Normal vs. Anomalous Agents",
        x = "Is Anomaly", y = "Value", fill = "Anomaly") +
-  theme_minimal()
+  waymo_theme()
 ```
 
 ```{r}
@@ -217,12 +261,12 @@ plots <- lapply(features_to_plot, function(feat) {
   ggplot(data_clean, aes_string(x = feat, y = "AnomalyScore", color = "Is_Anomaly")) +
     geom_point(alpha = 0.3, size = 0.8) +
     geom_smooth(aes(group = 1), method = "loess", se = FALSE,
-                color = "black", linewidth = 0.8) +
-    geom_hline(yintercept = score_threshold, linetype = "dashed", color = "red") +
-    scale_color_manual(values = c("No" = "#4CAF50", "Yes" = "#F44336")) +
+                color = waymo_navy, linewidth = 0.8) +
+    geom_hline(yintercept = score_threshold, linetype = "dashed", color = waymo_grey) +
+    scale_color_manual(values = waymo_anomaly) +
     labs(title = paste("Anomaly Score vs.", feat),
-         subtitle = "Red dashed = 99th percentile threshold") +
-    theme_minimal() +
+         subtitle = "Dashed = 99th percentile threshold") +
+    waymo_theme() +
     theme(legend.position = "none")
 })
 
@@ -247,16 +291,18 @@ perm_df <- data.frame(
   Importance = perm_importance
 ) %>% arrange(desc(Importance))
 
-p_iso_importance <- ggplot(perm_df, aes(x = reorder(Feature, Importance), y = Importance, fill = Feature)) +
+p_iso_importance <- ggplot(perm_df, aes(x = reorder(Feature, Importance),
+                                        y = Importance, fill = Feature)) +
   geom_col(show.legend = FALSE) +
   coord_flip() +
+  scale_fill_manual(values = waymo_feat) +
   labs(title    = "Isolation Forest: Permutation Feature Importance",
        subtitle = "Higher = shuffling this feature disrupts anomaly scores more",
        x = "", y = "Mean |Score Deviation|") +
-  theme_minimal()
+  waymo_theme()
 
 ggsave("../../docs/images/iso_forest_feature_importance.png", plot = p_iso_importance,
-       width = 7, height = 5, dpi = 300)
+       width = 7, height = 5, dpi = 300, type = "cairo")
 p_iso_importance
 
 print(perm_df)
@@ -273,18 +319,20 @@ agent_summary <- data_clean %>%
 
 p1 <- ggplot(agent_summary, aes(x = AgentType, y = Anomaly_Rate, fill = AgentType)) +
   geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = waymo_3col) +
   scale_y_continuous(labels = scales::percent) +
   labs(title = "Anomaly Rate by Agent Type", x = "", y = "% Flagged") +
-  theme_minimal()
+  waymo_theme()
 
 p2 <- ggplot(agent_summary, aes(x = AgentType, y = Mean_Score, fill = AgentType)) +
   geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = waymo_3col) +
   labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Score") +
-  theme_minimal()
+  waymo_theme()
 
 g_agent <- arrangeGrob(p1, p2, ncol = 2)
 ggsave("../../docs/images/anomaly_rate_by_agent_type.png", plot = g_agent,
-       width = 10, height = 5, dpi = 300)
+       width = 10, height = 5, dpi = 300, type = "cairo")
 grid.arrange(p1, p2, ncol = 2)
 print(agent_summary)
 ```
@@ -375,15 +423,16 @@ p_coef_ci <- ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
   geom_point(position = position_dodge(width = 0.5), size = 3) +
   geom_errorbar(aes(ymin = Lower, ymax = Upper),
                 position = position_dodge(width = 0.5), width = 0.3) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = waymo_grey) +
   coord_flip() +
+  scale_color_manual(values = waymo_2col) +
   labs(title    = "Regression Coefficients with 95% CI",
        subtitle = "With vs. without stationary agents",
        x = "", y = "Coefficient (metres per unit)") +
-  theme_minimal()
+  waymo_theme()
 
 ggsave("../../docs/images/regression_coefficients_ci.png", plot = p_coef_ci,
-       width = 8, height = 5, dpi = 300)
+       width = 8, height = 5, dpi = 300, type = "cairo")
 p_coef_ci
 ```
 
@@ -409,19 +458,19 @@ std_coef_df <- bind_rows(
 p_std_coef <- ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
   geom_col(position = "dodge") +
   coord_flip() +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = waymo_grey) +
+  scale_fill_manual(values = waymo_2col) +
   labs(title    = "Standardized Coefficients (β)",
        subtitle = "Magnitude = relative importance; sign = direction of effect",
        x = "", y = "β") +
-  theme_minimal()
+  waymo_theme()
 
 ggsave("../../docs/images/regression_feature_importance.png", plot = p_std_coef,
-       width = 7, height = 5, dpi = 300)
+       width = 7, height = 5, dpi = 300, type = "cairo")
 p_std_coef
 
 print(std_coef_df)
 ```
-
 
 ```{r}
 # VIF — multicollinearity check

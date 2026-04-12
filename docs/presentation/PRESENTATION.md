@@ -14,9 +14,7 @@
 Department of Computer Science — University of Miami
 CSC 642 · Spring 2026
 
----
-
-## Slide 2 — Problem & Motivation
+---## Slide 2 — Problem & Motivation
 
 **[Header]** The Long-Tail Problem in Autonomous Driving
 
