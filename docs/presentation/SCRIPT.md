@@ -1,4 +1,5 @@
 # Presentation Script — 20 Minutes
+
 ## Unsupervised Statistical Learning for Kinematic Anomaly Detection in Autonomous Driving Scenarios
 
 **Authors:** Pavel Stepanov, Ramses Loaces, Justin Cabrera
@@ -6,27 +7,11 @@
 
 ---
 
-## Timing Overview
-
-| Segment | Speaker | Duration | Cumulative |
-|---|---|---|---|
-| 1. Title & Hook | Pavel | 1 min | 1 min |
-| 2. Problem & Motivation | Pavel | 2 min | 3 min |
-| 3. Related Work | Ramses | 2 min | 5 min |
-| 4. Dataset & Pipeline | Pavel | 2 min | 7 min |
-| 5. Waymo Dataset Statistics | Justin | 2 min | 9 min |
-| 6. Methods: Anomaly Detection | Ramses | 2 min | 11 min |
-| 7. Methods: Motion Prediction | Justin | 1.5 min | 12.5 min |
-| 8. Results | Justin | 3.5 min | 16 min |
-| 9. Discussion & Limitations | Ramses | 2 min | 18 min |
-| 10. Conclusion & Future Work | Pavel | 1 min | 19 min |
-| 11. Questions (buffer) | All | 1 min | 20 min |
-
 **Speaker totals — Pavel: 6 min · Ramses: 6 min · Justin: 7 min · Q&A: 1 min**
 
 ---
 
-## Slide 1 — Title (1 min) | Speaker: Pavel
+## Slide 1 — Title (1 min) | Speaker: Pavel (Done)
 
 **[Show title slide with all three names]**
 
@@ -38,7 +23,7 @@
 
 ---
 
-## Slide 2 — Problem & Motivation (2 min) | Speaker: Pavel
+## Slide 2-3 — Problem & Motivation (2 min) | Speaker: Pavel (Done)
 
 **[Slide: image of urban traffic / AV sensor view, bullet points on the long tail problem]**
 
@@ -57,7 +42,7 @@
 
 ---
 
-## Slide 3 — Related Work (2 min) | Speaker: Ramses
+## Slide 4-5 — Related Work (2 min) | Speaker: Ramses (Done)
 
 **[Slide: brief comparison table — Kalman Filter / LSTM / Transformer / Isolation Forest / One-Class SVM]**
 
@@ -67,13 +52,13 @@
 >
 > On the anomaly detection side, two methods dominate: **One-Class SVM** and **Isolation Forest**. OC-SVM maps data into a high-dimensional kernel space and finds the tightest boundary around the normal class — but it's sensitive to the choice of kernel and the nu hyperparameter, which controls the fraction of training points treated as outliers.
 >
-> **Isolation Forest** works differently. It partitions the feature space by randomly selecting a feature and a split value at each node. The key insight is that anomalous points — being rare and extreme — require *fewer* splits to isolate. The anomaly score is derived from the average path length across all trees, normalized by the expected path length for a random point: s(x,n) = 2^(−E(h(x)) / c(n)). Scores near 1 signal anomalies; near 0.5 is indistinguishable from normal.
+> **Isolation Forest** works differently. It partitions the feature space by randomly selecting a feature and a split value at each node. The key insight is that anomalous points — being rare and extreme — require _fewer_ splits to isolate. The anomaly score is derived from the average path length across all trees, normalized by the expected path length for a random point: s(x,n) = 2^(−E(h(x)) / c(n)). Scores near 1 signal anomalies; near 0.5 is indistinguishable from normal.
 >
 > Prior work on the Waymo Open Motion Dataset has focused almost entirely on deep learning prediction pipelines. **Classical statistical baselines applied to the full agent population have been largely ignored.** That's the gap we fill.
 
 ---
 
-## Slide 4 — Dataset & Pipeline (2 min) | Speaker: Pavel
+## Slide 6 — Dataset & Pipeline (2 min) | Speaker: Pavel (Done)
 
 **[Slide: data flow diagram — GCS → Python notebook → CSV → R → Results]**
 
@@ -87,17 +72,13 @@
 
 ---
 
-## Slide 5 — Waymo Dataset Statistics (2 min) | Speaker: Justin
+## Slide 7-9 — Dataset Statistics (2 min) | Speaker: Justin
 
 **[Slide: agent type breakdown table, speed distribution histogram, correlation heatmap]**
 
 > Before diving into the models, let me give you a feel for what this data actually looks like.
 >
 > In terms of composition: vehicles make up roughly 70% of the dataset, pedestrians around 25%, and cyclists about 5%. The Waymo self-driving car — the SDC — is excluded from all analysis. This class imbalance matters: it affects the anomaly distribution and how we interpret per-class statistics.
->
-> **[Point to speed distribution histogram]**
->
-> Here's the speed distribution across all three agent types. One thing stands out immediately: vehicles appear *slower* than cyclists in the raw data — which seems wrong. It's entirely because a large fraction of vehicles are stopped at intersections. Once you filter to moving agents only, the expected ordering snaps back: vehicles fastest, then cyclists, then pedestrians. That's an important preprocessing consideration we carry into both models.
 >
 > **[Point to correlation heatmap]**
 >
@@ -106,6 +87,10 @@
 > This independence of yaw rate is not a nuisance — it's exactly what makes it a strong discriminating feature for anomaly detection. It carries information no other variable does. You'll see why that matters in the next slide.
 >
 > One last note on Waymo's behavioral flags: IsInteractive marks agents relevant to the AV's immediate planning — nearby vehicles at intersections. It is **not** a safety-incident label. That distinction will matter when we look at the results.
+>
+> **[Point to speed distribution histogram]**
+>
+> Here's the speed distribution across all three agent types. One thing stands out immediately: vehicles appear _slower_ than cyclists in the raw data — which seems wrong. It's entirely because a large fraction of vehicles are stopped at intersections. Once you filter to moving agents only, the expected ordering snaps back: vehicles fastest, then cyclists, then pedestrians. That's an important preprocessing consideration we carry into both models.
 
 ---
 
@@ -161,7 +146,7 @@
 >
 > There's one more detail worth highlighting: **none of the top 20 anomalies carry an IsInteractive flag from Waymo**. IsInteractive marks agents that are safety-relevant to the AV's immediate planning. Our most extreme kinematic outliers — the 180 km/h vehicle, the ±31 rad/s artifacts — were not flagged by Waymo as planning-relevant. We'll come back to what that means in discussion, but it's an important caveat to carry into the results.
 >
-**[Transition to regression results]**
+> **[Transition to regression results]**
 
 > For motion prediction: with stationary agents included, test RMSE **7.44 meters**, R-squared **0.880**. Remove stationary agents and RMSE jumps to **13.15 meters**, R-squared drops to **0.728**.
 >
@@ -220,18 +205,23 @@
 **Anticipated questions and prepared answers:**
 
 **Q: Why Isolation Forest and not One-Class SVM?**
+
 > Isolation Forest scales better to our dataset size (~4,500 agents) and requires no kernel tuning. One-Class SVM is sensitive to the nu hyperparameter and the kernel choice; IF is more robust out of the box and interpretable via feature importance.
 
 **Q: The 99th percentile threshold — isn't that arbitrary?**
+
 > It's a design choice, yes. We chose 1% to ensure only the most extreme kinematic outliers are flagged. The Fisher test validates that this threshold produces statistically meaningful, non-random groups. A lower threshold would give more recall at the cost of precision.
 
 **Q: None of the top 20 were IsInteractive — does that mean the results are useless?**
+
 > No — it means we're measuring something different from what IsInteractive tracks. IsInteractive is a proximity-based planning flag for routine AV decisions. Our pipeline finds kinematic extremes that fall outside normal operating ranges and surfaces data quality issues. Those are complementary, not competing, signals.
 
 **Q: Why linear regression and not something more powerful for prediction?**
+
 > Intentionally. We wanted to establish a classical baseline first. An R-squared of 0.88 from a linear model means there's strong linear signal in the kinematic features. Neural approaches should be benchmarked against this, not introduced without first knowing what simpler methods can already achieve.
 
 **Q: How generalizable are these results beyond Waymo?**
+
 > The kinematic features we use — speed, acceleration, yaw rate — are universal to any tracked agent. The pipeline is dataset-agnostic. The specific thresholds and model weights would need retraining, but the methodology transfers directly. The sensor artifact finding (±31 rad/s at near-zero speed) may also appear in other datasets using the same heading derivative computation.
 
 ---
@@ -239,7 +229,7 @@
 ## Delivery Tips
 
 - **Pace:** The script is calibrated for a natural speaking pace (~130 words/minute). Don't rush the results section — the videos need time to land.
-- **Transitions:** Each speaker should briefly introduce the next: *"I'll hand it over to Ramses who'll cover the dataset."*
+- **Transitions:** Each speaker should briefly introduce the next: _"I'll hand it over to Ramses who'll cover the dataset."_
 - **Videos:** Justin should pause briefly before and after the anomaly clips — let the visual register before continuing narration.
 - **IsInteractive nuance:** This is the most intellectually interesting finding in the project. Ramses should slow down here — it's counterintuitive and worth letting the audience process.
 - **Practice handoffs:** Key moments: Pavel → Ramses (after slide 2), Ramses → Pavel (after slide 3), Pavel → Ramses (after slide 4), Ramses → Justin (after slide 6), Justin → Ramses (after slide 8). Rehearse these.
