@@ -110,7 +110,11 @@ Results (Tables / Plots)
 | --------------- | ------ | ---------------------------- |
 | Vehicle         | ~70%   | Dominant class               |
 | Pedestrian      | ~25%   | More irregular motion        |
-| Cyclist         | ~5%    | Smallest class               |
+| Cyclist         | ~5%    | Smallest classOur anomaly detection pipeline has two layers — and as Justin just showed, the choice of yaw rate as a key feature comes directly from that correlation analysis.
+
+Layer 1: Isolation Forest. We fit 100 trees on Speed, Acceleration, and YawRate. Each agent receives an anomaly score between 0 and 1. We threshold at the 99th percentile — flagging 46 agents out of 4,538 as anomalous.
+
+Layer 2: Statistical Validation. We build a contingency table of agent type versus anomaly status and run Fisher's Exact Test with Monte Carlo simulation. Result: p = 0.0005. The anomalies are not uniformly distributed — certain agent types are disproportionately flagged. That's signal, not noise.               |
 | SDC (AV itself) | —      | Excluded from all analysis   |
 
 **[Show: speed_distribution.png — stacked histogram by agent type]**
