@@ -15,7 +15,7 @@
 
 **[Show title slide with all three names]**
 
-> Good [morning/afternoon], everyone. My name is Pavel Stepanov, and I'm here with my teammates Ramses Loaces and Justin Cabrera. Today we're presenting our research on unsupervised kinematic anomaly detection in autonomous driving.
+> Good afternoon, everyone. My name is Pavel Stepanov, and I'm here with my teammates Ramses Loaces and Justin Cabrera. Today we're presenting our research on unsupervised kinematic anomaly detection in autonomous driving.
 >
 > Here's the core question that drives our work: **How does an autonomous vehicle recognize that something unusual is happening on the road — without anyone ever labeling what "unusual" looks like?**
 >
