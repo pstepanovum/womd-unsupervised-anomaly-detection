@@ -64,7 +64,7 @@ waymo_theme <- function(base_size = 12) {
 ```
 
 ```{r}
-data <- read.csv("/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/data/waymo_dataset.csv")
+data <- read.csv("/Users/justincabrera/Documents/Statistical Learning/Assignments/womd-unsupervised-anomaly-detection/data/waymo_dataset.csv")
 cat("Total rows in raw dataset:", nrow(data), "\n")
 ```
 
@@ -235,7 +235,6 @@ print(perm_df)
 
 # 2b. Anomaly Detector Comparison — Isolation Forest vs. One-Class SVM vs. LOF
 
-*The rubric calls for a head-to-head comparison; we evaluate three classical unsupervised detectors on the same kinematic feature set with the same 1% contamination rate, and benchmark each against Waymo's `IsInteractive` flag and the agent-type association test.*
 
 ```{r}
 features    <- c("Speed", "Acceleration", "YawRate")
