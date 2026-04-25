@@ -15,6 +15,7 @@ library(tidyverse)
 library(caret)
 library(isotree)
 library(e1071)
+library(dbscan)
 library(gridExtra)
 library(car)
 library(showtext)
@@ -63,7 +64,7 @@ waymo_theme <- function(base_size = 12) {
 ```
 
 ```{r}
-data <- read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")
+data <- read.csv("/Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/data/waymo_dataset.csv")
 cat("Total rows in raw dataset:", nrow(data), "\n")
 ```
 
@@ -228,6 +229,142 @@ ggsave("../../docs/images/iso_forest_feature_importance.png", plot = p_iso_impor
 p_iso_importance
 
 print(perm_df)
+```
+
+---
+
+# 2b. Anomaly Detector Comparison — Isolation Forest vs. One-Class SVM vs. LOF
+
+*The rubric calls for a head-to-head comparison; we evaluate three classical unsupervised detectors on the same kinematic feature set with the same 1% contamination rate, and benchmark each against Waymo's `IsInteractive` flag and the agent-type association test.*
+
+```{r}
+features    <- c("Speed", "Acceleration", "YawRate")
+X           <- as.matrix(scale(data_clean[, features]))
+n           <- nrow(X)
+contam_frac <- 0.01
+top_k       <- ceiling(contam_frac * n)
+
+# --- Method 1: Isolation Forest (already fitted) ---
+iso_pred_anomaly <- as.integer(data_clean$Is_Anomaly == "Yes")
+
+# --- Method 2: One-Class SVM (RBF kernel, nu = 0.01) ---
+set.seed(42)
+ocsvm_model    <- svm(X, type = "one-classification",
+                      kernel = "radial", nu = contam_frac, scale = FALSE)
+ocsvm_decision <- predict(ocsvm_model, X, decision.values = TRUE)
+ocsvm_scores   <- -as.numeric(attr(ocsvm_decision, "decision.values"))
+ocsvm_thr      <- sort(ocsvm_scores, decreasing = TRUE)[top_k]
+ocsvm_anomaly  <- as.integer(ocsvm_scores >= ocsvm_thr)
+
+# --- Method 3: Local Outlier Factor (LOF, k = 20) ---
+set.seed(42)
+lof_scores  <- dbscan::lof(X, minPts = 20)
+lof_thr     <- sort(lof_scores, decreasing = TRUE)[top_k]
+lof_anomaly <- as.integer(lof_scores >= lof_thr)
+
+# Bundle for downstream analysis
+detector_flags <- list(
+  "Isolation Forest" = iso_pred_anomaly,
+  "One-Class SVM"    = ocsvm_anomaly,
+  "LOF"              = lof_anomaly
+)
+
+cat("Number flagged per detector (target =", top_k, "):\n")
+sapply(detector_flags, sum)
+```
+
+```{r}
+# Pairwise overlap (Jaccard similarity of flagged sets)
+jaccard <- function(a, b) {
+  inter <- sum(a == 1 & b == 1)
+  union <- sum(a == 1 | b == 1)
+  if (union == 0) 0 else inter / union
+}
+
+methods <- names(detector_flags)
+J <- matrix(NA, length(methods), length(methods),
+            dimnames = list(methods, methods))
+for (i in seq_along(methods))
+  for (j in seq_along(methods))
+    J[i, j] <- jaccard(detector_flags[[i]], detector_flags[[j]])
+
+cat("=== Pairwise Jaccard Overlap of Flagged Anomalies ===\n")
+print(round(J, 3))
+```
+
+```{r}
+# Comparison metrics: agent-type association + IsInteractive precision
+build_metrics <- function(flag_vec, name) {
+  ct       <- table(data_clean$AgentType, factor(flag_vec, levels = c(0, 1)))
+  fish_p   <- tryCatch(
+    fisher.test(ct, simulate.p.value = TRUE, B = 2000)$p.value,
+    error = function(e) NA_real_
+  )
+  flagged  <- which(flag_vec == 1)
+  prec_int <- mean(data_clean$IsInteractive[flagged] == "True")
+  pct_ped  <- mean(data_clean$AgentType[flagged] == "Pedestrian")
+  pct_cyc  <- mean(data_clean$AgentType[flagged] == "Cyclist")
+  data.frame(
+    Method                  = name,
+    N_Flagged               = sum(flag_vec),
+    Fisher_p                = fish_p,
+    Precision_IsInteractive = prec_int,
+    Pct_Pedestrian          = pct_ped,
+    Pct_Cyclist             = pct_cyc
+  )
+}
+
+comparison_df <- bind_rows(lapply(methods, function(m)
+  build_metrics(detector_flags[[m]], m)
+))
+
+cat("=== Detector Comparison Table ===\n")
+print(comparison_df, digits = 4)
+
+# Persist to CSV for the LaTeX paper
+write.csv(comparison_df,
+          "../../docs/submission/final-01/anomaly_comparison.csv",
+          row.names = FALSE)
+```
+
+```{r}
+# Visualize: bar chart of Fisher's test -log10(p) and Pedestrian % per detector
+plot_df <- comparison_df %>%
+  mutate(NegLogP = -log10(pmax(Fisher_p, 1e-4))) %>%
+  select(Method, NegLogP, Pct_Pedestrian, Pct_Cyclist) %>%
+  pivot_longer(-Method, names_to = "Metric", values_to = "Value")
+
+p_compare <- ggplot(plot_df, aes(x = Method, y = Value, fill = Method)) +
+  geom_col(show.legend = FALSE, color = waymo_white, linewidth = 0.3) +
+  facet_wrap(~ Metric, scales = "free_y",
+             labeller = labeller(Metric = c(
+               NegLogP        = "-log10(Fisher p)",
+               Pct_Pedestrian = "Fraction Pedestrian",
+               Pct_Cyclist    = "Fraction Cyclist"
+             ))) +
+  scale_fill_manual(values = c("Isolation Forest" = waymo_blue,
+                               "One-Class SVM"    = waymo_green,
+                               "LOF"              = waymo_grey)) +
+  labs(title    = "Unsupervised Anomaly Detector Comparison",
+       subtitle = "Same 1% contamination on Speed/Acceleration/YawRate",
+       x = "", y = "") +
+  waymo_theme() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+ggsave("../../docs/submission/final-01/images/anomaly_method_comparison.png",
+       plot = p_compare, width = 9, height = 4, dpi = 300, type = "cairo")
+p_compare
+```
+
+```{r}
+# Quick winner summary for the paper text
+winner_idx <- which.min(comparison_df$Fisher_p)
+cat("Best by Fisher's p:", comparison_df$Method[winner_idx],
+    "(p =", comparison_df$Fisher_p[winner_idx], ")\n")
+
+winner_idx2 <- which.max(comparison_df$Precision_IsInteractive)
+cat("Best by IsInteractive precision:", comparison_df$Method[winner_idx2],
+    "(prec =", round(comparison_df$Precision_IsInteractive[winner_idx2], 3), ")\n")
 ```
 
 ---

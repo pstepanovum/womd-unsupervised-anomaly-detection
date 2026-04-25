@@ -2,7 +2,7 @@ PWD /Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academi
 INPUT /usr/local/texlive/2025/texmf.cnf
 INPUT /usr/local/texlive/2025/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT /Users/pavelstepanov/Library/CloudStorage/OneDrive-UniversityofMiami/Academic/Spring 2026/CSC 642/research/womd-unsupervised-anomaly-detection/docs/submission/final-01/main.tex
+INPUT main.tex
 OUTPUT main.log
 INPUT /usr/local/texlive/2025/texmf-dist/tex/latex/ieeetran/IEEEtran.cls
 INPUT /usr/local/texlive/2025/texmf-dist/tex/latex/ieeetran/IEEEtran.cls
@@ -229,10 +229,6 @@ INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy8.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
-INPUT ./images/correlation_heatmap.png
-INPUT ./images/correlation_heatmap.png
-INPUT ./images/correlation_heatmap.png
-INPUT ./images/correlation_heatmap.png
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/times/ptmb7t.vf
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/times/ptmb8r.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/courier/pcrr7t.vf
@@ -240,6 +236,10 @@ INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/times/ptmrc7t.vf
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
+INPUT ./images/correlation_heatmap.png
+INPUT ./images/correlation_heatmap.png
+INPUT ./images/correlation_heatmap.png
+INPUT ./images/correlation_heatmap.png
 INPUT ./images/anomaly_examples.png
 INPUT ./images/anomaly_examples.png
 INPUT ./images/anomaly_examples.png
@@ -248,10 +248,15 @@ INPUT ./images/iso_forest_feature_importance.png
 INPUT ./images/iso_forest_feature_importance.png
 INPUT ./images/iso_forest_feature_importance.png
 INPUT ./images/iso_forest_feature_importance.png
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm
 INPUT ./images/regression_feature_importance.png
 INPUT ./images/regression_feature_importance.png
 INPUT ./images/regression_feature_importance.png
 INPUT ./images/regression_feature_importance.png
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/courier/pcrr7t.vf
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/times/ptmb7t.vf
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/times/ptmb8r.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT ./main.bbl
