@@ -1,11 +1,22 @@
 # Data
 *.tfrecord
 *.RData
-# Outputs
-*.log
-*.aux
+
+# Python
 __pycache__/
+
+# OS / editor
 .DS_Store
 
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
 
-
+# Office lock files
+~$*

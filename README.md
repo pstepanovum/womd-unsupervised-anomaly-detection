@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![R 4.0+](https://img.shields.io/badge/R-4.0+-276DC3.svg)](https://www.r-project.org/)
-[![Paper](https://img.shields.io/badge/Paper-PDF-red.svg)](docs/submission/final-01/main.pdf)
+[![Paper](https://img.shields.io/badge/Paper-PDF-red.svg)](docs/paper/Stepanov_Loaces_Cabrera_KinematicAnomalyDetection.pdf)
 
 ## Abstract
 
@@ -56,7 +56,10 @@ The analysis uses the **Waymo Open Motion Dataset (v1.3.1)**. Raw TFRecord files
 
 ```
 .
-├── docs/submission/final-01/   IEEE-format paper (main.tex, main.pdf, figures)
+├── docs/
+│   ├── paper/                  IEEE-format final paper (main.tex, named PDF, figures, anomaly_comparison.csv)
+│   ├── presentation/           Slides, script, fonts
+│   └── archive/                Earlier submissions (proposal, midterm)
 ├── src/python/                 Colab notebook for WOMD TFRecord extraction
 ├── src/r/                      R Markdown statistical pipeline
 ├── results/                    Top-anomaly listings, key model results, videos
@@ -90,7 +93,7 @@ rmarkdown::render("src/r/ProjectSubmission.Rmd")
 Build the IEEE-format paper:
 
 ```bash
-cd docs/submission/final-01
+cd docs/paper
 latexmk -pdf main.tex
 ```
 
