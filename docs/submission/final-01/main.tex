@@ -38,7 +38,7 @@ justin.cabrera2718@gmail.com}
 \maketitle
 
 \begin{abstract}
-Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 10{,}000 traffic agents and apply Isolation Forest for outlier scoring, validated via Fisher's Exact Test against agent-type labels. Correlation analysis shows that yaw rate is essentially uncorrelated with all other features ($r \approx 0.02$), making it the most distinct signal in the feature set. Inspection of the flagged anomalies finds that most are near-stationary agents with unrealistically high yaw rate readings ($\pm$31\,rad/s), likely a sensor artifact, while a small number correspond to genuinely unusual high-speed events. A linear regression model for 5-second displacement shows that speed ($\beta = 0.95$) is the dominant predictor---a separate finding from anomaly detection that together paints a clearer picture of agent behavior. Results show that kinematic outliers are distributed unevenly across agent types ($p < 0.001$), and motion forecasting performs well ($R^2 = 0.88$) when stationary agents are included.
+Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 18{,}000 traffic agent observations and apply Isolation Forest for outlier scoring on a filtered cohort of 4{,}538 moving agents, validated via Fisher's Exact Test against agent-type labels. Correlation analysis shows that yaw rate is essentially uncorrelated with all other features ($r \approx 0.02$), making it the most distinct signal in the feature set. Inspection of the flagged anomalies finds that most are near-stationary agents with unrealistically high yaw rate readings ($\pm$31\,rad/s), likely a sensor artifact, while a small number correspond to genuinely unusual high-speed events. A linear regression model for 5-second displacement shows that speed ($\beta = 0.95$) is the dominant predictor---a separate finding from anomaly detection that together paints a clearer picture of agent behavior. Results show that kinematic outliers are distributed unevenly across agent types ($p < 0.001$), and motion forecasting performs well ($R^2 = 0.88$) when stationary agents are included.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -103,7 +103,7 @@ A linear regression model was fitted to predict 5-second future displacement ($\
 
 \subsection{Evaluation}
 
-Anomaly detection performance was assessed via confusion matrix statistics (accuracy, sensitivity, specificity, balanced accuracy) and AUC-ROC from 5-fold cross-validation. Motion prediction performance was evaluated using Root Mean Squared Error (RMSE) and the coefficient of determination ($R^2$) on the held-out test set.
+Anomaly detection was evaluated qualitatively by inspecting the top-ranked outliers and quantitatively by testing the association between agent type and anomaly status using Fisher's Exact Test. Motion prediction performance was evaluated using Root Mean Squared Error (RMSE) and the coefficient of determination ($R^2$) on the held-out test set, with 5-fold cross-validation on the training partition.
 
 % =============================================================
 \section{Results}
@@ -166,6 +166,22 @@ Looking at the top 20 flagged agents, most fall into one of two groups. A small 
 
 The remaining flagged agents, however, are near-stationary ($v < 3$\,m/s) with yaw rate values stuck at $\pm$31\,rad/s. This value appears in 12 of the top 20 anomalies across all three agent types. A rotation rate of 31\,rad/s ($\approx$5 full rotations per second) is not physically plausible for a ground agent, and the pattern---always near zero speed, always the same magnitude---points to a sensor artifact or numerical instability in heading derivative computation. All 20 top anomalies have \texttt{IsInteractive = False}, meaning Waymo itself did not flag any of them as safety-relevant interactions. So most of the top anomalies turned out to be data noise rather than real dangerous behavior.
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{anomaly_examples.png}
+\caption{Representative anomalous scenarios surfaced by the Isolation Forest. From top to bottom: (1)~a speeding vehicle exceeding the local cohort, (2)~an aggressive lane-change maneuver, and (3)~a sensor artifact in which a near-stationary agent registers an implausible $\pm$31\,rad/s yaw rate.}
+\label{fig:anomaly_examples}
+\end{figure}
+
+Figure~\ref{fig:anomaly_examples} shows three representative cases drawn from the top-ranked outliers, illustrating the two genuine event categories (speeding, aggressive lane change) and the dominant sensor-artifact pattern. Figure~\ref{fig:iso_importance} presents the Isolation Forest permutation importance, which quantifies how much each feature contributes to the score.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{iso_forest_feature_importance.png}
+\caption{Isolation Forest permutation feature importance. All three kinematic features contribute comparably, with Speed and Acceleration slightly above YawRate.}
+\label{fig:iso_importance}
+\end{figure}
+
 \subsection{Motion Prediction Results}
 
 The linear regression model predicting 5-second future displacement from kinematic state variables demonstrated strong performance when stationary agents were included: test RMSE $= 7.44$\,m, $R^2 = 0.880$, and cross-validated RMSE $= 7.65$\,m ($R^2_\text{CV} = 0.886$). When stationary agents were removed, test performance degraded substantially: RMSE $= 13.15$\,m, $R^2 = 0.728$, suggesting that the near-zero displacement of stationary agents provides strong predictive signal that the model leverages when present. Results are summarized in Table~\ref{tab:regression}.
@@ -184,6 +200,15 @@ Without stationary & 13.15 & 0.728 & 10.05 & 0.860 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{regression_feature_importance.png}
+\caption{Standardized linear regression coefficients for predicting 5-second future displacement. Speed dominates the prediction in both data regimes, while yaw rate contributes negligibly.}
+\label{fig:regression_importance}
+\end{figure}
+
+Figure~\ref{fig:regression_importance} visualizes the standardized regression coefficients, confirming that Speed ($\beta = 0.95$) is by far the dominant predictor, while YawRate contributes essentially nothing.
+
 % =============================================================
 \section{Discussion}
 % =============================================================
@@ -192,7 +217,7 @@ The Fisher's Exact Test result confirms that Isolation Forest scores are not ran
 
 The drop in regression performance when stationary agents are removed ($\Delta R^2 = -0.15$) is expected: stationary agents are trivially predictable (future displacement $\approx 0$), so removing them makes the prediction task harder. The model evaluated on moving agents only ($R^2 = 0.73$) is the more honest number for real-world use.
 
-One thing worth noting is that anomaly detection and regression are answering different questions. The Isolation Forest flags agents primarily on yaw rate, which is independent of speed and size---it captures erratic turning behavior. The regression model, by contrast, gives speed a standardized coefficient of $\beta = 0.95$ and yaw rate near zero ($\beta \approx -0.007$). This is not a contradiction: yaw rate tells you if something is behaving unusually, while speed tells you how far it will go. They measure different things.
+One thing worth noting is that anomaly detection and regression are answering different questions. The Isolation Forest flags agents primarily on yaw rate, which is independent of speed and size---it captures erratic turning behavior. The regression model, by contrast, gives speed a standardized coefficient of $\beta = 0.95$ while yaw rate is essentially zero (Fig.~\ref{fig:regression_importance}). This is not a contradiction: yaw rate tells you if something is behaving unusually, while speed tells you how far it will go. They measure different things.
 
 On the sensor artifact: the $\pm$31\,rad/s yaw rate cluster in near-stationary agents looks like a data quality issue, possibly from numerical instability in computing heading derivatives at near-zero speed. If you ran this pipeline on raw yaw rate without any filtering, most of your top anomalies would be this artifact rather than real dangerous behavior. A simple filter (e.g., $|\dot{\psi}| < 10$\,rad/s) would likely surface more meaningful events in the top results.
 
