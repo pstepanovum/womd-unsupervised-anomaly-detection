@@ -149,6 +149,13 @@ Width    &       &       &       &       & 1.000 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{correlation_heatmap.png}
+\caption{Pearson correlation heatmap for the kinematic and morphological feature set. Yaw rate is essentially uncorrelated with all other features, while length and width are nearly redundant.}
+\label{fig:corr_heatmap}
+\end{figure}
+
 This matters for anomaly detection because a feature that does not correlate with others will tend to drive Isolation Forest scores on its own, which is consistent with what we observe in the results below.
 
 \subsection{Anomaly Detection Results}
