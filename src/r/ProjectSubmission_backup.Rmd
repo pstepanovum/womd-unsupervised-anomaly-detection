@@ -1,0 +1,486 @@
+---
+title: "Waymo Project"
+output: html_document
+date: "2026-03-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Introduction
+
+Autonomous vehicles (AVs) must safely navigate dynamic urban environments involving vehicles, cyclists, and pedestrians. Two major challenges in this setting are detecting anomalous driving behavior and predicting short-term future motion of surrounding agents.
+
+This project addresses both challenges using trajectory data derived from the Waymo Open Dataset. Specifically, we aim to:
+
+- Detect anomalous motion patterns using unsupervised learning.
+- Predict 5-second future displacement using supervised regression.
+- Compare results when stationary agents are included versus removed.
+
+---
+
+# State-of-the-Art
+
+Modern autonomous driving systems rely heavily on:
+
+- Trajectory forecasting models (Kalman Filters, LSTMs, Transformers)
+- Unsupervised anomaly detection (Isolation Forest, One-Class SVM)
+- Multi-agent interaction models
+
+Short-horizon forecasting (3–5 seconds) is often modeled using kinematic state variables. Isolation Forest remains widely used due to its scalability and minimal distributional assumptions.
+
+---
+
+# Materials and Methods
+
+## Dataset
+
+For each agent, kinematic features are extracted at the prediction horizon (t = 0). The feature set includes:
+
+- **Speed (v)**: Magnitude of the velocity vector (m/s).
+- **Acceleration (a)**: Rate of change of speed (m/s²).
+- **Yaw Rate (ψ̇)**: Angular velocity representing the rate of change of heading (rad/s).
+
+## Pipeline
+
+1. Raw Waymo Motion Dataset extracted using Python (see `src/python/waymo.ipynb`).
+2. Dataset exported as CSV.
+3. Correlation EDA → Isolation Forest anomaly detection → Linear regression for motion prediction.
+
+## Pre-processing
+
+- Removed invalid frames (`Valid_Current != True`)
+- Removed stationary agents (`Speed > 0`)
+- Removed missing values in predictors
+
+---
+
+# Code Implementation
+
+```{r}
+library(tidyverse)
+library(caret)
+library(isotree)
+library(e1071)
+library(gridExtra)
+library(car)
+library(showtext)
+set.seed(42)
+
+# --- Waymo Font (Latin Modern Roman — the actual LaTeX font) ---
+font_add("LM Roman",
+         regular  = "~/Library/Fonts/lmroman10-regular.otf",
+         bold     = "~/Library/Fonts/lmroman10-bold.otf",
+         italic   = "~/Library/Fonts/lmroman10-italic.otf")
+showtext_auto()
+showtext_opts(dpi = 300)
+
+# --- Waymo Color Palette ---
+waymo_green <- "#00C389"
+waymo_blue  <- "#1A73E8"
+waymo_grey  <- "#8A8F94"
+waymo_navy  <- "#1F233F"
+waymo_white <- "#FFFFFF"
+
+waymo_2col    <- c("With Stationary"    = waymo_blue,  "Without Stationary" = waymo_green)
+waymo_3col    <- c("Cyclist"            = waymo_grey,  "Pedestrian"         = waymo_green,
+                   "Vehicle"            = waymo_blue)
+waymo_anomaly <- c("No"                 = waymo_green, "Yes"                = waymo_navy)
+waymo_feat    <- c("Speed"              = waymo_blue,  "Acceleration"       = waymo_green,
+                   "YawRate"            = waymo_grey)
+
+# --- Waymo ggplot Theme ---
+waymo_theme <- function(base_size = 12) {
+  theme_minimal(base_size = base_size) +
+  theme(
+    text             = element_text(family = "LM Roman", color = waymo_navy),
+    plot.title       = element_text(face = "bold", size = base_size + 2, color = waymo_navy),
+    plot.subtitle    = element_text(size = base_size - 1, color = waymo_grey),
+    axis.text        = element_text(color = waymo_navy),
+    axis.title       = element_text(color = waymo_navy),
+    panel.grid.major = element_line(color = "#E8EAED"),
+    panel.grid.minor = element_blank(),
+    legend.text      = element_text(color = waymo_navy),
+    legend.title     = element_text(color = waymo_navy, face = "bold"),
+    plot.background  = element_rect(fill = waymo_white, color = NA),
+    panel.background = element_rect(fill = waymo_white, color = NA),
+    strip.text       = element_text(color = waymo_navy, face = "bold")
+  )
+}
+```
+
+```{r}
+data <- read.csv("/Users/justincabrera/Documents/Statistical Learning/Datasets/waymo_final_dataset.csv")
+cat("Total rows in raw dataset:", nrow(data), "\n")
+```
+
+```{r}
+# Pre-processing
+data_clean <- data %>%
+  filter(Speed != 0) %>%
+  filter(Valid_Current == "True") %>%
+  drop_na(Speed, Acceleration, YawRate, Length, Width)
+
+data_clean$AgentType <- as.factor(data_clean$AgentType)
+cat("Final cleaned dataset size:", nrow(data_clean), "\n")
+```
+
+---
+
+# 1. Correlation EDA
+
+*Starting with EDA to understand feature relationships before modeling.*
+
+```{r}
+kinematic_vars <- c("Speed", "Acceleration", "YawRate", "Length", "Width")
+cor_matrix <- cor(data_clean[, kinematic_vars], use = "complete.obs")
+cat("=== Pearson Correlation Matrix ===\n")
+print(round(cor_matrix, 3))
+```
+
+```{r}
+# Correlation heatmap
+cor_df <- as.data.frame(cor_matrix) %>%
+  rownames_to_column("Var1") %>%
+  pivot_longer(-Var1, names_to = "Var2", values_to = "Correlation")
+
+dir.create("../../docs/images", recursive = TRUE, showWarnings = FALSE)
+
+p_heatmap <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
+  geom_tile(color = waymo_white, linewidth = 0.5) +
+  geom_text(aes(label = round(Correlation, 2)), size = 3.5, fontface = "bold",
+            color = waymo_navy, family = "LM Roman") +
+  scale_fill_gradient2(low = waymo_blue, mid = waymo_white, high = waymo_green,
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(title = "Feature Correlation Heatmap — All Agent Types",
+       subtitle = "YawRate is near-zero correlated with all other features",
+       x = "", y = "") +
+  waymo_theme() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("../../docs/images/correlation_heatmap.png", plot = p_heatmap,
+       width = 7, height = 6, dpi = 300, type = "cairo")
+p_heatmap
+```
+
+```{r}
+# Descriptive summary
+summary(data_clean[, c("Speed", "Acceleration", "YawRate")])
+
+p_speed <- ggplot(data_clean, aes(x = Speed, fill = AgentType)) +
+  geom_histogram(bins = 40, color = waymo_white, linewidth = 0.2, alpha = 0.9) +
+  scale_fill_manual(values = waymo_3col) +
+  labs(title    = "Speed Distribution — All Agent Types",
+       subtitle = "Moving agents only (Speed > 0); right-skewed across all classes",
+       x        = "Speed (m/s)",
+       y        = "Count",
+       fill     = "Agent Type") +
+  waymo_theme()
+
+ggsave("../../docs/images/speed_distribution.png", plot = p_speed,
+       width = 8, height = 5, dpi = 300, type = "cairo")
+p_speed
+
+cat("Speed skewness:", e1071::skewness(data_clean$Speed), "\n")
+cat("99th percentile acceleration:", quantile(data_clean$Acceleration, 0.99), "\n")
+```
+
+---
+
+# 2. Isolation Forest — Anomaly Detection
+
+*YawRate's independence from other features makes it a strong candidate for anomaly isolation.*
+
+```{r}
+iso_model <- isolation.forest(
+  data_clean[, c("Speed", "Acceleration", "YawRate")],
+  ntrees   = 100,
+  nthreads = 1
+)
+
+data_clean$AnomalyScore <- predict(
+  iso_model,
+  data_clean[, c("Speed", "Acceleration", "YawRate")]
+)
+
+score_threshold <- quantile(data_clean$AnomalyScore, 0.99)
+
+data_clean$Is_Anomaly <- as.factor(
+  ifelse(data_clean$AnomalyScore > score_threshold, "Yes", "No")
+)
+
+cat("Anomaly threshold (99th percentile):", score_threshold, "\n")
+table(data_clean$Is_Anomaly)
+```
+
+```{r}
+# Who are the anomalous agents?
+anomalous_agents <- data_clean %>%
+  filter(Is_Anomaly == "Yes") %>%
+  select(ScenarioID, AgentID, AgentType, Speed, Acceleration,
+         YawRate, Length, Width, AnomalyScore, IsInteractive) %>%
+  arrange(desc(AnomalyScore))
+
+cat("Total flagged:", nrow(anomalous_agents), "\n\n")
+
+cat("=== Breakdown by Agent Type ===\n")
+print(table(anomalous_agents$AgentType))
+
+cat("\n=== Top 20 Most Anomalous Agents ===\n")
+print(head(anomalous_agents, 20))
+
+cat("\n=== Summary Statistics ===\n")
+print(summary(anomalous_agents[, c("Speed", "Acceleration", "YawRate", "AnomalyScore")]))
+
+cat("\n=== % flagged as Interactive by Waymo ===\n")
+print(prop.table(table(anomalous_agents$IsInteractive)))
+```
+
+```{r}
+# Fisher's Exact Test: is anomaly rate associated with AgentType?
+contingency_table <- table(data_clean$AgentType, data_clean$Is_Anomaly)
+fisher.test(contingency_table, simulate.p.value = TRUE)
+```
+
+## Isolation Forest Explainability
+
+```{r}
+# Feature distributions: normal vs anomalous
+data_clean %>%
+  select(Speed, Acceleration, YawRate, Is_Anomaly) %>%
+  pivot_longer(-Is_Anomaly, names_to = "Feature", values_to = "Value") %>%
+  ggplot(aes(x = Is_Anomaly, y = Value, fill = Is_Anomaly)) +
+  geom_violin(alpha = 0.6, trim = TRUE) +
+  geom_boxplot(width = 0.12, outlier.size = 0.8, alpha = 0.8) +
+  facet_wrap(~Feature, scales = "free_y") +
+  scale_fill_manual(values = waymo_anomaly) +
+  labs(title = "Feature Distributions: Normal vs. Anomalous Agents",
+       x = "Is Anomaly", y = "Value", fill = "Anomaly") +
+  waymo_theme()
+```
+
+```{r}
+# Anomaly score vs each feature with LOESS
+features_to_plot <- c("Speed", "Acceleration", "YawRate")
+
+plots <- lapply(features_to_plot, function(feat) {
+  ggplot(data_clean, aes_string(x = feat, y = "AnomalyScore", color = "Is_Anomaly")) +
+    geom_point(alpha = 0.3, size = 0.8) +
+    geom_smooth(aes(group = 1), method = "loess", se = FALSE,
+                color = waymo_navy, linewidth = 0.8) +
+    geom_hline(yintercept = score_threshold, linetype = "dashed", color = waymo_grey) +
+    scale_color_manual(values = waymo_anomaly) +
+    labs(title = paste("Anomaly Score vs.", feat),
+         subtitle = "Dashed = 99th percentile threshold") +
+    waymo_theme() +
+    theme(legend.position = "none")
+})
+
+grid.arrange(grobs = plots, ncol = 2,
+             top = "Isolation Forest: Score Sensitivity per Feature")
+```
+
+```{r}
+# Permutation feature importance
+set.seed(42)
+baseline_scores <- data_clean$AnomalyScore
+
+perm_importance <- sapply(features_to_plot, function(feat) {
+  shuffled <- data_clean[, features_to_plot]
+  shuffled[[feat]] <- sample(shuffled[[feat]])
+  perm_scores <- predict(iso_model, shuffled)
+  mean(abs(perm_scores - baseline_scores))
+})
+
+perm_df <- data.frame(
+  Feature    = names(perm_importance),
+  Importance = perm_importance
+) %>% arrange(desc(Importance))
+
+p_iso_importance <- ggplot(perm_df, aes(x = reorder(Feature, Importance),
+                                        y = Importance, fill = Feature)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = waymo_feat) +
+  labs(title    = "Isolation Forest: Permutation Feature Importance",
+       subtitle = "Higher = shuffling this feature disrupts anomaly scores more",
+       x = "", y = "Mean |Score Deviation|") +
+  waymo_theme()
+
+ggsave("../../docs/images/iso_forest_feature_importance.png", plot = p_iso_importance,
+       width = 7, height = 5, dpi = 300, type = "cairo")
+p_iso_importance
+
+print(perm_df)
+```
+
+```{r}
+# Anomaly rate and mean score by AgentType
+agent_summary <- data_clean %>%
+  group_by(AgentType) %>%
+  summarise(Count        = n(),
+            Anomaly_Rate = mean(Is_Anomaly == "Yes"),
+            Mean_Score   = mean(AnomalyScore),
+            .groups      = "drop")
+
+p1 <- ggplot(agent_summary, aes(x = AgentType, y = Anomaly_Rate, fill = AgentType)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = waymo_3col) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Anomaly Rate by Agent Type", x = "", y = "% Flagged") +
+  waymo_theme()
+
+p2 <- ggplot(agent_summary, aes(x = AgentType, y = Mean_Score, fill = AgentType)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = waymo_3col) +
+  labs(title = "Mean Anomaly Score by Agent Type", x = "", y = "Mean Score") +
+  waymo_theme()
+
+g_agent <- arrangeGrob(p1, p2, ncol = 2)
+ggsave("../../docs/images/anomaly_rate_by_agent_type.png", plot = g_agent,
+       width = 10, height = 5, dpi = 300, type = "cairo")
+grid.arrange(p1, p2, ncol = 2)
+print(agent_summary)
+```
+
+---
+
+# 3. Linear Regression — Motion Prediction
+
+*Does YawRate, identified as the key anomaly signal, also predict future displacement?*
+
+```{r}
+# Base cleaned dataset
+base_data <- data %>%
+  filter(!is.na(Speed), !is.na(Acceleration), !is.na(YawRate),
+         !is.na(Vel_X), !is.na(Vel_Y), !is.na(FutureDist_5s))
+
+data_with_stationary <- base_data
+data_no_stationary   <- subset(base_data, Speed > 0)
+
+cat("With stationary:", nrow(data_with_stationary), "\n")
+cat("Without stationary:", nrow(data_no_stationary), "\n")
+
+# Speed by AgentType (moving only)
+cat("\nMean speed by agent type (moving agents):\n")
+aggregate(Speed ~ AgentType, data = data_no_stationary, mean)
+```
+
+```{r}
+run_model <- function(dataset) {
+  set.seed(123)
+  n           <- nrow(dataset)
+  train_index <- sample(1:n, size = 0.8 * n)
+  train       <- dataset[train_index, ]
+  test        <- dataset[-train_index, ]
+  control     <- trainControl(method = "cv", number = 5)
+
+  model <- train(
+    FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+    data      = train,
+    method    = "lm",
+    trControl = control
+  )
+
+  pred <- predict(model, newdata = test)
+  rmse <- sqrt(mean((pred - test$FutureDist_5s)^2))
+  r2   <- 1 - sum((pred - test$FutureDist_5s)^2) /
+              sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
+
+  list(RMSE = rmse, R2 = r2, CV_Results = model$results)
+}
+
+results_with    <- run_model(data_with_stationary)
+results_without <- run_model(data_no_stationary)
+
+cat("=== With Stationary ===\n");    print(results_with)
+cat("\n=== Without Stationary ===\n"); print(results_without)
+```
+
+## Regression Explainability
+
+```{r}
+lm_with    <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                 data = data_with_stationary)
+lm_without <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                 data = data_no_stationary)
+
+summary(lm_with)
+summary(lm_without)
+```
+
+```{r}
+# Coefficient plot with 95% CI — both datasets overlaid
+extract_coefs <- function(model, label) {
+  ci  <- confint(model)
+  est <- coef(model)
+  data.frame(Term = rownames(ci), Estimate = est,
+             Lower = ci[,1], Upper = ci[,2], Dataset = label,
+             stringsAsFactors = FALSE)
+}
+
+coef_df <- bind_rows(
+  extract_coefs(lm_with,    "With Stationary"),
+  extract_coefs(lm_without, "Without Stationary")
+) %>% filter(Term != "(Intercept)")
+
+p_coef_ci <- ggplot(coef_df, aes(x = reorder(Term, Estimate), y = Estimate,
+                    color = Dataset, shape = Dataset)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper),
+                position = position_dodge(width = 0.5), width = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = waymo_grey) +
+  coord_flip() +
+  scale_color_manual(values = waymo_2col) +
+  labs(title    = "Regression Coefficients with 95% CI",
+       subtitle = "With vs. without stationary agents",
+       x = "", y = "Coefficient (metres per unit)") +
+  waymo_theme()
+
+ggsave("../../docs/images/regression_coefficients_ci.png", plot = p_coef_ci,
+       width = 8, height = 5, dpi = 300, type = "cairo")
+p_coef_ci
+```
+
+```{r}
+# Standardized beta coefficients
+scale_df <- function(df) {
+  df %>% mutate(across(c(Speed, Acceleration, YawRate, Vel_X, Vel_Y, FutureDist_5s),
+                       ~ as.numeric(scale(.))))
+}
+
+lm_with_std    <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                     data = scale_df(data_with_stationary))
+lm_without_std <- lm(FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
+                     data = scale_df(data_no_stationary))
+
+std_coef_df <- bind_rows(
+  data.frame(Term = names(coef(lm_with_std)[-1]),
+             Beta = coef(lm_with_std)[-1], Dataset = "With Stationary"),
+  data.frame(Term = names(coef(lm_without_std)[-1]),
+             Beta = coef(lm_without_std)[-1], Dataset = "Without Stationary")
+)
+
+p_std_coef <- ggplot(std_coef_df, aes(x = reorder(Term, abs(Beta)), y = Beta, fill = Dataset)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = waymo_grey) +
+  scale_fill_manual(values = waymo_2col) +
+  labs(title    = "Standardized Coefficients (β)",
+       subtitle = "Magnitude = relative importance; sign = direction of effect",
+       x = "", y = "β") +
+  waymo_theme()
+
+ggsave("../../docs/images/regression_feature_importance.png", plot = p_std_coef,
+       width = 7, height = 5, dpi = 300, type = "cairo")
+p_std_coef
+
+print(std_coef_df)
+```
+
+```{r}
+# VIF — multicollinearity check
+cat("=== VIF: With Stationary ===\n");    print(vif(lm_with))
+cat("\n=== VIF: Without Stationary ===\n"); print(vif(lm_without))
+```
