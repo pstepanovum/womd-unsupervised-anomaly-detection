@@ -7,7 +7,8 @@
 \providecommand{\BIBentrySTDinterwordspacing}{\spaceskip=0pt\relax}
 \providecommand{\BIBentryALTinterwordstretchfactor}{4}
 \providecommand{\BIBentryALTinterwordspacing}{\spaceskip=\fontdimen2\font plus
-\BIBentryALTinterwordstretchfactor\fontdimen3\font minus \fontdimen4\font\relax}
+\BIBentryALTinterwordstretchfactor\fontdimen3\font minus
+  \fontdimen4\font\relax}
 \providecommand{\BIBforeignlanguage}[2]{{%
 \expandafter\ifx\csname l@#1\endcsname\relax
 \typeout{** WARNING: IEEEtran.bst: No hyphenation pattern has been}%
@@ -21,21 +22,37 @@
 \BIBdecl
 
 \bibitem{pimentel2014review}
-M.~A. Pimentel, D.~A. Clifton, L.~Clifton, and L.~Tarassenko, ``A review of novelty detection,'' \emph{Signal Processing}, vol.~99, pp. 215--249, 2014.
+M.~A. Pimentel, D.~A. Clifton, L.~Clifton, and L.~Tarassenko, ``A review of
+  novelty detection,'' \emph{Signal Processing}, vol.~99, pp. 215--249, 2014.
 
 \bibitem{ettinger2021waymo}
-S.~Ettinger, S.~Cheng, B.~Caine, C.~Liu, H.~Zhao, S.~Pradhan, Y.~Chai, B.~Sapp, C.~R. Qi, Y.~Zhou \emph{et~al.}, ``Waymo open dataset: Perception and prediction,'' in \emph{Proceedings of the IEEE/CVF International Conference on Computer Vision}, 2021, pp. 10\,308--10\,317.
+S.~Ettinger, S.~Cheng, B.~Caine, C.~Liu, H.~Zhao, S.~Pradhan, Y.~Chai, B.~Sapp,
+  C.~R. Qi, Y.~Zhou \emph{et~al.}, ``Waymo open dataset: Perception and
+  prediction,'' in \emph{Proceedings of the IEEE/CVF International Conference
+  on Computer Vision}, 2021, pp. 10\,308--10\,317.
 
 \bibitem{liu2008isolation}
-F.~T. Liu, K.~M. Ting, and Z.-H. Zhou, ``Isolation forest,'' in \emph{2008 Eighth IEEE International Conference on Data Mining}.\hskip 1em plus 0.5em minus 0.4em\relax IEEE, 2008, pp. 413--422.
+F.~T. Liu, K.~M. Ting, and Z.-H. Zhou, ``Isolation forest,'' in \emph{2008
+  Eighth IEEE International Conference on Data Mining}.\hskip 1em plus 0.5em
+  minus 0.4em\relax IEEE, 2008, pp. 413--422.
 
 \bibitem{scholkopf2001estimating}
-B.~Sch{\"o}lkopf, J.~C. Platt, J.~Shawe-Taylor, A.~J. Smola, and R.~C. Williamson, ``Estimating the support of a high-dimensional distribution,'' \emph{Neural computation}, vol.~13, no.~7, pp. 1443--1471, 2001.
+B.~Sch{\"o}lkopf, J.~C. Platt, J.~Shawe-Taylor, A.~J. Smola, and R.~C.
+  Williamson, ``Estimating the support of a high-dimensional distribution,''
+  \emph{Neural computation}, vol.~13, no.~7, pp. 1443--1471, 2001.
 
 \bibitem{sun2020scalability}
-P.~Sun, H.~Kretzschmar, X.~Dotiwalla, A.~Chouard, V.~Patnaik, P.~Tsui, J.~Guo, Y.~Zhou, Y.~Chai, B.~Caine \emph{et~al.}, ``Scalability in perception for autonomous driving: An academy-industry joint effort,'' in \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2020, pp. 2448--2458.
+P.~Sun, H.~Kretzschmar, X.~Dotiwalla, A.~Chouard, V.~Patnaik, P.~Tsui, J.~Guo,
+  Y.~Zhou, Y.~Chai, B.~Caine \emph{et~al.}, ``Scalability in perception for
+  autonomous driving: An academy-industry joint effort,'' in \emph{Proceedings
+  of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2020,
+  pp. 2448--2458.
 
 \bibitem{waymo_motion_dataset}
-Y.~Zhou, S.~Ettinger, S.~Cheng, B.~Caine, C.~Liu, S.~Pradhan, B.~Sapp, C.~R. Qi, Y.~Chai, T.~Huang \emph{et~al.}, ``Waymo open motion dataset: A large-scale dataset for motion prediction in autonomous driving,'' in \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2020, pp. 9710--9719.
+Y.~Zhou, S.~Ettinger, S.~Cheng, B.~Caine, C.~Liu, S.~Pradhan, B.~Sapp, C.~R.
+  Qi, Y.~Chai, T.~Huang \emph{et~al.}, ``Waymo open motion dataset: A
+  large-scale dataset for motion prediction in autonomous driving,'' in
+  \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+  Recognition}, 2020, pp. 9710--9719.
 
 \end{thebibliography}

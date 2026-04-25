@@ -6,4 +6,8 @@
 *.aux
 __pycache__/
 .DS_Store
+.claude
+CLAUDE.md
+
+
 

@@ -9,33 +9,8 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{booktabs}
-\usepackage{listings}
-\usepackage{courier}
 
-\lstdefinestyle{Rstyle}{
-  language=R,
-  basicstyle=\scriptsize\ttfamily,
-  keywordstyle=\bfseries\color{blue!70!black},
-  commentstyle=\itshape\color{gray},
-  stringstyle=\color{orange!80!black},
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  numbersep=5pt,
-  breaklines=true,
-  breakatwhitespace=true,
-  frame=single,
-  framesep=3pt,
-  xleftmargin=10pt,
-  xrightmargin=3pt,
-  captionpos=b,
-  showstringspaces=false,
-  tabsize=2,
-  morekeywords={library,set.seed,read.csv,filter,drop_na,as.factor,
-                isolation.forest,predict,quantile,ifelse,table,
-                fisher.test,createDataPartition,downSample,trainControl,
-                twoClassSummary,train,confusionMatrix,subset,aggregate,
-                sqrt,mean,sum,sample,return,list}
-}
+\graphicspath{{images/}}
 
 \begin{document}
 
@@ -63,7 +38,7 @@ justin.cabrera2718@gmail.com}
 \maketitle
 
 \begin{abstract}
-Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 10{,}000 traffic agents and apply Isolation Forest for outlier scoring, validated via Fisher's Exact Test against agent-type labels. Correlation analysis shows that yaw rate is essentially uncorrelated with all other features ($r \approx 0.02$), making it the most distinct signal in the feature set. Inspection of the flagged anomalies finds that most are near-stationary agents with unrealistically high yaw rate readings ($\pm$31\,rad/s), likely a sensor artifact, while a small number correspond to genuinely unusual high-speed events. A linear regression model for 5-second displacement shows that speed ($\beta = 0.95$) is the dominant predictor---a separate finding from anomaly detection that together paints a clearer picture of agent behavior. Results show that kinematic outliers are distributed unevenly across agent types ($p < 0.001$), and motion forecasting performs well ($R^2 = 0.88$) when stationary agents are included.
+Autonomous vehicles must operate safely in environments characterized by stochastic human behavior. While nominal driving scenarios are well-represented in current datasets, identifying anomalous events---such as aggressive maneuvering or near-miss interactions---remains a challenge due to the scarcity of labeled high-risk data. This paper presents an unsupervised statistical learning framework applied to the Waymo Open Motion Dataset (v1.3.1). We extract kinematic features from over 18{,}000 traffic agent observations and apply Isolation Forest for outlier scoring on a filtered cohort of 4{,}538 moving agents, validated via Fisher's Exact Test against agent-type labels. Correlation analysis shows that yaw rate is essentially uncorrelated with all other features ($r \approx 0.02$), making it the most distinct signal in the feature set. Inspection of the flagged anomalies finds that most are near-stationary agents with unrealistically high yaw rate readings ($\pm$31\,rad/s), likely a sensor artifact, while a small number correspond to genuinely unusual high-speed events. A linear regression model for 5-second displacement shows that speed ($\beta = 0.95$) is the dominant predictor---a separate finding from anomaly detection that together paints a clearer picture of agent behavior. Results show that kinematic outliers are distributed unevenly across agent types ($p < 0.001$), and motion forecasting performs well ($R^2 = 0.88$) when stationary agents are included.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -122,15 +97,13 @@ Agent type was encoded as a factor variable. All datasets were partitioned into 
 
 An Isolation Forest model \cite{liu2008isolation} with 100 trees was fitted on the three kinematic features (Speed, Acceleration, YawRate). Anomaly scores were computed for all agents; observations whose score exceeded the 99th percentile were flagged as anomalous, yielding a binary label \texttt{Is\_Anomaly}. The statistical association between agent type and anomaly status was assessed using Fisher's Exact Test with Monte Carlo simulation (2{,}000 replicates) on the resulting contingency table.
 
-To further characterize the morphological and kinematic profile of detected anomalies, a Random Forest classifier was trained on the balanced training set using bounding box dimensions (Length, Width) and YawRate as predictors. Down-sampling was applied to address the severe class imbalance (99:1 ratio). Model selection was performed via 5-fold cross-validation optimizing the area under the ROC curve (AUC-ROC).
-
 \subsection{Motion Prediction}
 
 A linear regression model was fitted to predict 5-second future displacement ($\Delta d_{5s}$) from the kinematic state vector (Speed, Acceleration, YawRate, $V_x$, $V_y$). Two experimental conditions were evaluated: (A) all agents including stationary ones, and (B) moving agents only (\texttt{Speed} $> 0$). Both models were trained with 5-fold cross-validation and evaluated on the held-out test set.
 
 \subsection{Evaluation}
 
-Anomaly detection performance was assessed via confusion matrix statistics (accuracy, sensitivity, specificity, balanced accuracy) and AUC-ROC from 5-fold cross-validation. Motion prediction performance was evaluated using Root Mean Squared Error (RMSE) and the coefficient of determination ($R^2$) on the held-out test set.
+Anomaly detection was evaluated qualitatively by inspecting the top-ranked outliers and quantitatively by testing the association between agent type and anomaly status using Fisher's Exact Test. Motion prediction performance was evaluated using Root Mean Squared Error (RMSE) and the coefficient of determination ($R^2$) on the held-out test set, with 5-fold cross-validation on the training partition.
 
 % =============================================================
 \section{Results}
@@ -176,6 +149,13 @@ Width    &       &       &       &       & 1.000 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{correlation_heatmap.png}
+\caption{Pearson correlation heatmap for the kinematic and morphological feature set. Yaw rate is essentially uncorrelated with all other features, while length and width are nearly redundant.}
+\label{fig:corr_heatmap}
+\end{figure}
+
 This matters for anomaly detection because a feature that does not correlate with others will tend to drive Isolation Forest scores on its own, which is consistent with what we observe in the results below.
 
 \subsection{Anomaly Detection Results}
@@ -186,24 +166,21 @@ Looking at the top 20 flagged agents, most fall into one of two groups. A small 
 
 The remaining flagged agents, however, are near-stationary ($v < 3$\,m/s) with yaw rate values stuck at $\pm$31\,rad/s. This value appears in 12 of the top 20 anomalies across all three agent types. A rotation rate of 31\,rad/s ($\approx$5 full rotations per second) is not physically plausible for a ground agent, and the pattern---always near zero speed, always the same magnitude---points to a sensor artifact or numerical instability in heading derivative computation. All 20 top anomalies have \texttt{IsInteractive = False}, meaning Waymo itself did not flag any of them as safety-relevant interactions. So most of the top anomalies turned out to be data noise rather than real dangerous behavior.
 
-The Random Forest classifier trained on morphological and kinematic features (Length, Width, YawRate) achieved an AUC-ROC of 0.887 (mtry $= 2$, 5-fold CV), with sensitivity of 0.836 and specificity of 0.839. On the held-out test set, overall accuracy was 79.5\% with a balanced accuracy of 73.1\%, and a specificity of 0.667 on the minority (anomalous) class. Performance metrics are summarized in Table~\ref{tab:rf}.
-
-\begin{table}[h]
+\begin{figure}[h]
 \centering
-\caption{Random Forest Anomaly Classifier Performance}
-\label{tab:rf}
-\begin{tabular}{lcc}
-\toprule
-Metric & CV (Train) & Test (Hold-out) \\
-\midrule
-AUC-ROC     & 0.887 & ---   \\
-Sensitivity & 0.836 & 0.796 \\
-Specificity & 0.839 & 0.667 \\
-Accuracy    & ---   & 0.795 \\
-Balanced Acc.& ---  & 0.731 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=\columnwidth]{anomaly_examples.png}
+\caption{Representative anomalous scenarios surfaced by the Isolation Forest. From top to bottom: (1)~a speeding vehicle exceeding the local cohort, (2)~an aggressive lane-change maneuver, and (3)~a sensor artifact in which a near-stationary agent registers an implausible $\pm$31\,rad/s yaw rate.}
+\label{fig:anomaly_examples}
+\end{figure}
+
+Figure~\ref{fig:anomaly_examples} shows three representative cases drawn from the top-ranked outliers, illustrating the two genuine event categories (speeding, aggressive lane change) and the dominant sensor-artifact pattern. Figure~\ref{fig:iso_importance} presents the Isolation Forest permutation importance, which quantifies how much each feature contributes to the score.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{iso_forest_feature_importance.png}
+\caption{Isolation Forest permutation feature importance. All three kinematic features contribute comparably, with Speed and Acceleration slightly above YawRate.}
+\label{fig:iso_importance}
+\end{figure}
 
 \subsection{Motion Prediction Results}
 
@@ -223,6 +200,15 @@ Without stationary & 13.15 & 0.728 & 10.05 & 0.860 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{regression_feature_importance.png}
+\caption{Standardized linear regression coefficients for predicting 5-second future displacement. Speed dominates the prediction in both data regimes, while yaw rate contributes negligibly.}
+\label{fig:regression_importance}
+\end{figure}
+
+Figure~\ref{fig:regression_importance} visualizes the standardized regression coefficients, confirming that Speed ($\beta = 0.95$) is by far the dominant predictor, while YawRate contributes essentially nothing.
+
 % =============================================================
 \section{Discussion}
 % =============================================================
@@ -231,7 +217,7 @@ The Fisher's Exact Test result confirms that Isolation Forest scores are not ran
 
 The drop in regression performance when stationary agents are removed ($\Delta R^2 = -0.15$) is expected: stationary agents are trivially predictable (future displacement $\approx 0$), so removing them makes the prediction task harder. The model evaluated on moving agents only ($R^2 = 0.73$) is the more honest number for real-world use.
 
-One thing worth noting is that anomaly detection and regression are answering different questions. The Isolation Forest flags agents primarily on yaw rate, which is independent of speed and size---it captures erratic turning behavior. The regression model, by contrast, gives speed a standardized coefficient of $\beta = 0.95$ and yaw rate near zero ($\beta \approx -0.007$). This is not a contradiction: yaw rate tells you if something is behaving unusually, while speed tells you how far it will go. They measure different things.
+One thing worth noting is that anomaly detection and regression are answering different questions. The Isolation Forest flags agents primarily on yaw rate, which is independent of speed and size---it captures erratic turning behavior. The regression model, by contrast, gives speed a standardized coefficient of $\beta = 0.95$ while yaw rate is essentially zero (Fig.~\ref{fig:regression_importance}). This is not a contradiction: yaw rate tells you if something is behaving unusually, while speed tells you how far it will go. They measure different things.
 
 On the sensor artifact: the $\pm$31\,rad/s yaw rate cluster in near-stationary agents looks like a data quality issue, possibly from numerical instability in computing heading derivatives at near-zero speed. If you ran this pipeline on raw yaw rate without any filtering, most of your top anomalies would be this artifact rather than real dangerous behavior. A simple filter (e.g., $|\dot{\psi}| < 10$\,rad/s) would likely surface more meaningful events in the top results.
 
@@ -240,125 +226,6 @@ On the sensor artifact: the $\pm$31\,rad/s yaw rate cluster in near-stationary a
 % =============================================================
 
 This paper applied Isolation Forest anomaly detection and linear regression for motion prediction to the Waymo Open Motion Dataset. A few things stood out. Yaw rate is the only feature that is uncorrelated with everything else ($r \approx 0.02$), which makes it the main driver of the anomaly scores. Looking at the top flagged anomalies, only about 3 of the top 20 corresponded to genuinely unusual events (high speed, high acceleration); the rest were near-stationary agents with a $\pm$31\,rad/s yaw rate that appears to be a sensor artifact. For motion prediction, speed dominates ($\beta = 0.95$) while yaw rate contributes almost nothing---a separate finding from anomaly detection, since the two models are measuring different things. The $R^2 = 0.88$ on the full dataset drops to 0.73 on moving agents only, which is the more realistic number. Overall, classical statistical methods work reasonably well here and are easier to interpret than black-box alternatives. Future work should filter the yaw rate artifact before running anomaly detection, and check results against Waymo's \texttt{IsInteractive} labels as a ground-truth reference.
-
-% =============================================================
-\section{Code Implementation}
-% =============================================================
-
-All analyses were implemented in R. The complete pipeline is organized into three stages: preprocessing, anomaly detection, and motion prediction.
-
-\subsection{Preprocessing}
-
-Listing~\ref{lst:preproc} shows the data loading and cleaning pipeline. Stationary agents are excluded and only frames with valid current observations are retained before dropping incomplete kinematic records.
-
-\begin{lstlisting}[style=Rstyle, caption={Data loading and preprocessing.}, label={lst:preproc}]
-library(tidyverse); library(caret)
-library(isotree); library(randomForest)
-set.seed(42)
-
-data <- read.csv("waymo_final_dataset.csv")
-# cat("Total rows in raw dataset:", nrow(data))
-# 18311
-
-# Remove stationary agents; keep valid frames only
-data_clean <- data %>%
-  filter(Speed != 0) %>%
-  filter(Valid_Current == "True") %>%
-  drop_na(Speed, Acceleration, YawRate, Length, Width)
-data_clean$AgentType <- as.factor(data_clean$AgentType)
-# cat("Cleaned dataset size:", nrow(data_clean))  # 4538
-\end{lstlisting}
-
-\newpage
-
-\subsection{Anomaly Detection}
-
-Listing~\ref{lst:isoforest} fits the Isolation Forest model and assigns binary anomaly labels at the 99th-percentile score threshold. Listing~\ref{lst:fisher} tests the association between agent type and anomaly status. Listing~\ref{lst:rf} trains the Random Forest classifier on a down-sampled balanced training set.
-
-\begin{lstlisting}[style=Rstyle, caption={Isolation Forest scoring and anomaly labeling.}, label={lst:isoforest}]
-iso_model <- isolation.forest(
-  data_clean[, c("Speed", "Acceleration", "YawRate")],
-  ntrees = 100, nthreads = 1
-)
-data_clean$AnomalyScore <- predict(
-  iso_model,
-  data_clean[, c("Speed", "Acceleration", "YawRate")]
-)
-threshold <- quantile(data_clean$AnomalyScore, 0.99)
-data_clean$Is_Anomaly <- as.factor(
-  ifelse(data_clean$AnomalyScore > threshold, "Yes", "No")
-)
-# table(data_clean$Is_Anomaly)  ->  No: 4492  Yes: 46
-\end{lstlisting}
-
-\begin{lstlisting}[style=Rstyle, caption={Fisher's Exact Test for agent-type association.}, label={lst:fisher}]
-ct <- table(data_clean$AgentType, data_clean$Is_Anomaly)
-fisher.test(ct, simulate.p.value = TRUE)
-# p-value = 0.0004998
-\end{lstlisting}
-
-\begin{lstlisting}[style=Rstyle, caption={Random Forest classifier with 5-fold CV.}, label={lst:rf}]
-trainIdx <- createDataPartition(data_clean$Is_Anomaly,
-                                p = 0.8, list = FALSE)
-train_data <- data_clean[trainIdx, ]
-test_data  <- data_clean[-trainIdx, ]
-
-# Down-sample to balance classes (99:1 ratio)
-train_bal <- downSample(
-  x = train_data[, c("Length", "Width", "YawRate")],
-  y = train_data$Is_Anomaly
-)
-names(train_bal)[names(train_bal) == "Class"] <- "Is_Anomaly"
-
-ctrl <- trainControl(method = "cv", number = 5,
-                     classProbs = TRUE,
-                     summaryFunction = twoClassSummary)
-rf_model <- train(
-  Is_Anomaly ~ Length + Width + YawRate,
-  data = train_bal, method = "rf",
-  metric = "ROC", trControl = ctrl
-)
-# Best mtry = 2;  CV AUC-ROC = 0.887
-
-preds <- predict(rf_model, test_data)
-confusionMatrix(preds, test_data$Is_Anomaly)
-# Balanced Accuracy: 0.731
-\end{lstlisting}
-
-\vspace{150px}
-
-\subsection{Motion Prediction}
-
-Listing~\ref{lst:regression} defines a reusable helper that fits a linear regression model via 5-fold CV and evaluates it on a held-out test set, applied under both data regimes.
-
-\begin{lstlisting}[style=Rstyle, caption={Linear regression for 5-second displacement prediction.}, label={lst:regression}]
-base_data <- subset(data,
-  !is.na(Speed) & !is.na(Acceleration) & !is.na(YawRate) &
-  !is.na(Vel_X) & !is.na(Vel_Y)        & !is.na(FutureDist_5s))
-
-data_with <- base_data                          # N = 6614
-data_nosta <- subset(base_data, Speed > 0)      # N = 3196
-
-run_model <- function(dataset) {
-  set.seed(123)
-  n   <- nrow(dataset)
-  idx <- sample(1:n, size = 0.8 * n)
-  train <- dataset[idx, ];  test <- dataset[-idx, ]
-  ctrl  <- trainControl(method = "cv", number = 5)
-  mdl   <- train(
-    FutureDist_5s ~ Speed + Acceleration + YawRate + Vel_X + Vel_Y,
-    data = train, method = "lm", trControl = ctrl
-  )
-  pred <- predict(mdl, newdata = test)
-  rmse <- sqrt(mean((pred - test$FutureDist_5s)^2))
-  r2   <- 1 - sum((pred - test$FutureDist_5s)^2) /
-              sum((test$FutureDist_5s - mean(test$FutureDist_5s))^2)
-  list(RMSE = rmse, R2 = r2)
-}
-
-run_model(data_with)    # RMSE = 7.44,  R^2 = 0.880
-run_model(data_nosta)   # RMSE = 13.15, R^2 = 0.728
-\end{lstlisting}
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
