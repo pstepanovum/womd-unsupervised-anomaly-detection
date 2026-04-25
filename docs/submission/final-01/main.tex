@@ -213,7 +213,7 @@ Figure~\ref{fig:regression_importance} visualizes the standardized regression co
 \section{Discussion}
 % =============================================================
 
-The Fisher's Exact Test result confirms that Isolation Forest scores are not random---anomalous agents cluster more in pedestrians and cyclists, which makes sense given that those agent types move more erratically.
+The Isolation Forest flagged 46 agents as anomalous (1\% of the dataset), and Fisher's Exact Test ($p = 0.0005$) confirms that this result is statistically significant---anomaly labeling is not randomly distributed across agent types. The more important observation, however, is what those anomalies actually are. Inspecting the top flagged cases, the majority correspond to near-stationary agents with $\pm$31\,rad/s yaw rate readings---a physically implausible value that points to a sensor artifact or numerical instability in the heading derivative, not real driving behavior. A smaller subset, perhaps 3 of the top 20, represent genuinely unusual kinematic events: one vehicle traveling at 49.75\,m/s with an acceleration of 355\,m/s$^2$, and a handful of agents with extreme yaw rates at non-trivial speeds. So the Fisher's test tells you the model is detecting something real and non-random---but that ``something'' is largely a data quality signal, with only a minority of flagged cases reflecting actual anomalous driver behavior.
 
 The drop in regression performance when stationary agents are removed ($\Delta R^2 = -0.15$) is expected: stationary agents are trivially predictable (future displacement $\approx 0$), so removing them makes the prediction task harder. The model evaluated on moving agents only ($R^2 = 0.73$) is the more honest number for real-world use.
 
